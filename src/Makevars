@@ -1,0 +1,17 @@
+# Define paths to GSL and libomp libraries
+# CC = /opt/homebrew/opt/llvm/bin/clang
+# CXX = /opt/homebrew/opt/llvm/bin/clang++
+
+# LIB_GSL = /opt/homebrew/Cellar/gsl/2.8
+# LIB_OMP = /opt/homebrew/opt/libomp
+
+# Compiler flags to include GSL headers and enable OpenMP
+# PKG_CPPFLAGS = -I$(LIB_GSL)/include -I$(LIB_OMP)/include
+# PKG_CFLAGS = -I$(LIB_GSL)/include -I$(LIB_OMP)/include $(SHLIB_OPENMP_CFLAGS)
+PKG_CPPFLAGS = $(SHLIB_OPENMP_CFLAGS) -I/hpc/apps/htslib/1.22.1/include
+PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS) -g -O0
+
+
+# Linker flags to link with GSL and OpenMP libraries
+# PKG_LIBS = $(SHLIB_OPENMP_CFLAGS) -lgsl -lgslcblas
+PKG_LIBS = -L/hpc/apps/htslib/1.22.1/lib -lhts

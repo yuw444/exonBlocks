@@ -5,3 +5,7 @@
 .DS_Store
 .quarto
 .vscode
+tests
+.Rbuildignore
+meta
+
