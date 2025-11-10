@@ -27,18 +27,17 @@ exonBlocks maps cell-barcode + UMI read blocks (from BAM-derived TSVs) to annota
 Undefined global functions or variables:
   .data
     - no treatement needed as .data are reserved variable within `dplyr` package
-- 
 
 ## Tests and examples
 - testthat tests are included under tests/testthat and pass locally with devtools::check().
-- Examples in Rd documentation are guarded with \dontrun{} where they require large BAM files or user data (so R CMD check on CRAN will not try to run long, data-dependent examples).
+- Examples in Rd documentation are guarded with \dontrun{} where they require large BAM files and user data (so R CMD check on CRAN will not try to run long, data-dependent examples).
 
 ## System requirements / external resources
 - An indexed BAM is required to run the example workflow that calls extract_exon_reads_hts(); however, no external data or network access is required for package installation or running unit tests.
-- No non-R system libraries are required.
+- htslib(https://github.com/samtools/htslib) is required.
 
 ## Additional notes for reviewers
-- If you see the LazyData NOTE, it will be removed in the final submission (no data shipped).
+- If you see the git related file, it will be removed in the final submission.
 - If CRAN requires changes to any packaging metadata, please advise and I will address them promptly.
 
 For questions or follow-ups: Yu Wang <ywang@mcw.edu>
