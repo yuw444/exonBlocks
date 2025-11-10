@@ -1,13 +1,21 @@
 Package: exonBlocks
+Type: Package
 Title: Exon Blocks Extraction and Analysis
-Version: 0.0.0.9000
-Authors@R: 
-    person("Yu", "Wang", , "ywang@mcw.edu", role = c("aut", "cre"))
-Description: Map Cell Barcode + UMI to Overlapping Exons.
+Version: 0.1.0
+Authors@R: c(person(given = "Yu", family = "Wang",
+             email = "ywang@mcw.edu",
+             role = c("aut", "cre"),
+             comment = c(ORCID = "0000-0002-4586-5679")))
+Author: Yu Wang [aut, cre]
+Maintainer: Yu Wang <ywang@mcw.edu>
+Description: Map cell barcode + UMI-level read blocks to overlapping exons. Expands
+ semicolon-delimited block fields and assigns blocks to annotated exons using
+ data.table::foverlaps.
 License: MIT + file LICENSE
 Encoding: UTF-8
+LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Suggests: 
-    testthat (>= 3.0.0)
+Imports: data.table (>= 1.17.0), dplyr (>= 1.1.4), tidyr (>= 1.3.1), magrittr (>= 2.0.3)
+Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3

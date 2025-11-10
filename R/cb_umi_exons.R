@@ -16,52 +16,54 @@
 #' @return A data.table of overlapping records. Columns include at minimum:
 #'   CB, UMI, block_start, block_end, start, end, exon (columns produced by foverlaps).
 #'   Each row represents one block-entry (after expansion) overlapping one exon.
-#' @import data.table dplyr tidyr
+#' @importFrom magrittr %>%
+#' @importFrom data.table foverlaps setDT as.data.table
+#' @importFrom dplyr select mutate
+#' @importFrom tidyr separate_rows
 #' @export
 #' @examples
 #' \dontrun{
-#'   blocks_tsv <- "AI.tsv"
-#'   exons_tsv  <- "meta_exons.tsv"
-#'   res <- cb_umi_exons(tsv = blocks_tsv, meta_exons = exons_tsv)
-#'   head(res)
+#' blocks_tsv <- "AI.tsv"
+#' exons_tsv <- "meta_exons.tsv"
+#' res <- cb_umi_exons(tsv = blocks_tsv, meta_exons = exons_tsv)
+#' head(res)
 #' }
 #' @seealso data.table::foverlaps, tidyr::separate_rows
 cb_umi_exons <- function(
     tsv,
-    meta_exons
-) {
+    meta_exons) {
     df_blocks <- data.table::fread(
         tsv,
         header = TRUE
     ) %>%
         as.data.frame() %>%
-        tidyr::separate_rows(block_start, block_end, block_seq, sep = ";") %>%
+        tidyr::separate_rows(.data$block_start, .data$block_end, .data$block_seq, sep = ";") %>%
         dplyr::mutate(
-            block_start = as.integer(block_start),
-            block_end = as.integer(block_end)
+            block_start = as.integer(.data$block_start),
+            block_end = as.integer(.data$block_end)
         ) %>%
-        as.data.table()
-    
+        data.table::as.data.table()
+
     df_exons <- data.table::fread(
         meta_exons,
         header = TRUE
     ) %>%
         as.data.frame() %>%
-        dplyr::select(chr, start, end, exon) %>%
-        as.data.table()
-    
-    setDT(df_blocks, key = c("block_start", "block_end"))
-    setDT(df_exons, key = c("start", "end"))
-    
+        dplyr::select(.data$chr, .data$start, .data$end, .data$exon) %>%
+        data.table::as.data.table()
+
+    data.table::setDT(df_blocks, key = c("block_start", "block_end"))
+    data.table::setDT(df_exons, key = c("start", "end"))
+
     # Merge blocks with exons based on overlap
-    df_merged <- foverlaps(
-        df_blocks[, .(CB, UMI, block_start, block_end)],
-        df_exons[, .(start, end, exon)],
+    df_merged <- data.table::foverlaps(
+        df_blocks,
+        df_exons,
         by.x = c("block_start", "block_end"),
         by.y = c("start", "end"),
         type = "any",
         nomatch = 0L
     )
-    
+
     return(df_merged)
 }

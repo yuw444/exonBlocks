@@ -36,10 +36,10 @@ tidyr::separate_rows();
 }
 \examples{
 \dontrun{
-  blocks_tsv <- "AI.tsv"
-  exons_tsv  <- "meta_exons.tsv"
-  res <- cb_umi_exons(tsv = blocks_tsv, meta_exons = exons_tsv)
-  head(res)
+blocks_tsv <- "AI.tsv"
+exons_tsv <- "meta_exons.tsv"
+res <- cb_umi_exons(tsv = blocks_tsv, meta_exons = exons_tsv)
+head(res)
 }
 }
 \seealso{
