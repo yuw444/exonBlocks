@@ -2,10 +2,6 @@
 # CC = /opt/homebrew/opt/llvm/bin/clang
 # CXX = /opt/homebrew/opt/llvm/bin/clang++
 
-PKG_CPPFLAGS = $(shell pkg-config --cflags --libs htslib)
-
-PKG_CFLAGS = $(shell pkg-config --cflags --libs htslib)
-
 PKG_LIBS = $(shell pkg-config --cflags --libs htslib)
 
 .PHONY: show-flags
