@@ -1,31 +1,103 @@
-# Define paths to GSL and libomp libraries
-# CC = /opt/homebrew/opt/llvm/bin/clang
-# CXX = /opt/homebrew/opt/llvm/bin/clang++
+## ---- User override via environment ---------------------------------------
+## Allow users/CI to predefine HTSLIB_DIR, HTSLIB_CFLAGS, HTSLIB_LIBS.
+## These take highest precedence if non-empty.
 
-## Try pkg-config first
-PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null)
-PKG_LIBS   += $(shell pkg-config --libs   htslib 2>/dev/null)
+# Normalize empties helper
+empty :=
+space := $(empty) $(empty)
 
-## If pkg-config yielded nothing, try environment variable HTSLIB_DIR
+# Accumulators R expects:
+PKG_CPPFLAGS ?=
+PKG_CFLAGS   ?=
+PKG_LIBS     ?=
+
+# 1) Honor explicit HTSLIB_CFLAGS/HTSLIB_LIBS if provided
+ifneq ($(strip $(HTSLIB_CFLAGS)),)
+  PKG_CFLAGS   += $(HTSLIB_CFLAGS)
+endif
+ifneq ($(strip $(HTSLIB_LIBS)),)
+  PKG_LIBS     += $(HTSLIB_LIBS)
+endif
+
+# 2) pkg-config (if available and not already satisfied)
 ifeq ($(strip $(PKG_CFLAGS)),)
-  ifneq ($(strip $(HTSLIB_DIR)),)
+  PKG_CFLAGS   += $(shell pkg-config --cflags htslib 2>/dev/null)
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  PKG_LIBS     += $(shell pkg-config --libs   htslib 2>/dev/null)
+endif
+
+# 3) HTSLIB_DIR environment (e.g., /opt/homebrew/Cellar/htslib/1.22.1 or /hpc/apps/htslib/1.15)
+ifneq ($(strip $(HTSLIB_DIR)),)
+  ifeq ($(strip $(PKG_CFLAGS)),)
     PKG_CFLAGS += -I$(HTSLIB_DIR)/include
-    PKG_LIBS     += -L$(HTSLIB_DIR)/lib -lhts
+  endif
+  ifeq ($(strip $(PKG_LIBS)),)
+    PKG_LIBS   += -L$(HTSLIB_DIR)/lib -lhts
   endif
 endif
 
-## Final hardcoded fallback (edit to your site)
+# 4) Common fallbacks (macOS & conda); only if still empty
 ifeq ($(strip $(PKG_CFLAGS)),)
-  PKG_CFLAGS += -I/hpc/apps/htslib/1.15/include
-  PKG_LIBS     += -L/hpc/apps/htslib/1.15/lib -lhts
+  # Homebrew (Apple Silicon first, then Intel)
+  ifneq ("$(wildcard /opt/homebrew/include/htslib)","")
+    PKG_CFLAGS += -I/opt/homebrew/include
+  else ifneq ("$(wildcard /usr/local/include/htslib)","")
+    PKG_CFLAGS += -I/usr/local/include
+  else ifneq ("$(wildcard /opt/local/include/htslib)","")
+    PKG_CFLAGS += -I/opt/local/include
+  else ifneq ($(strip $(CONDA_PREFIX)),)
+    ifneq ("$(wildcard $(CONDA_PREFIX)/include/htslib)","")
+      PKG_CFLAGS += -I$(CONDA_PREFIX)/include
+    endif
+  endif
 endif
 
+ifeq ($(strip $(PKG_LIBS)),)
+  ifneq ("$(wildcard /opt/homebrew/lib/libhts.*)","")
+    PKG_LIBS   += -L/opt/homebrew/lib -lhts
+  else ifneq ("$(wildcard /usr/local/lib/libhts.*)","")
+    PKG_LIBS   += -L/usr/local/lib -lhts
+  else ifneq ("$(wildcard /opt/local/lib/libhts.*)","")
+    PKG_LIBS   += -L/opt/local/lib -lhts
+  else ifneq ($(strip $(CONDA_PREFIX)),)
+    ifneq ("$(wildcard $(CONDA_PREFIX)/lib/libhts.*)","")
+      PKG_LIBS += -L$(CONDA_PREFIX)/lib -lhts
+    endif
+  endif
+endif
+
+# 5) Your HPC fallback (only if still empty)
+ifeq ($(strip $(PKG_CFLAGS)),)
+  ifneq ("$(wildcard /hpc/apps/htslib/1.15/include/htslib)","")
+    PKG_CFLAGS += -I/hpc/apps/htslib/1.15/include
+  endif
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  ifneq ("$(wildcard /hpc/apps/htslib/1.15/lib/libhts.*)","")
+    PKG_LIBS   += -L/hpc/apps/htslib/1.15/lib -lhts
+  endif
+endif
+
+# 6) Fail clearly if still not found
+ifeq ($(strip $(PKG_CFLAGS)),)
+  $(error Could not find htslib headers. Set HTSLIB_DIR or install via pkg-config/Homebrew/Conda.)
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  $(error Could not find htslib library. Set HTSLIB_DIR or install via pkg-config/Homebrew/Conda.)
+endif
+
+## Optional: tighten compilation (works fine with Clang and GCC)
+CFLAGS   += -Wall -O2
+CXXFLAGS += -Wall -O2
+
+## Helper to print resolved flags (safe; won’t hijack builds)
+ifeq ($(MAKECMDGOALS),show-flags)
 .PHONY: show-flags
 show-flags:
-	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
+	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
 	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
 	@echo "PKG_LIBS=$(PKG_LIBS)"
 	@echo "CFLAGS=$(CFLAGS)"
 	@echo "CXXFLAGS=$(CXXFLAGS)"
-
-.DEFAULT_GOAL := all
+endif
