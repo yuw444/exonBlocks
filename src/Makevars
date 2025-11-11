@@ -2,8 +2,21 @@
 # CC = /opt/homebrew/opt/llvm/bin/clang
 # CXX = /opt/homebrew/opt/llvm/bin/clang++
 
-PKG_CPPFLAGS += $(shell pkg-config --cflags htslib)
-PKG_LIBS     += $(shell pkg-config --libs htslib)
+## Try pkg-config first
+PKG_CPPFLAGS = $(shell pkg-config --cflags htslib 2>/dev/null)
+PKG_LIBS     = $(shell pkg-config --libs   htslib 2>/dev/null)
+
+## If pkg-config didn't return anything, try Homebrew (macOS arm64/intel)
+ifeq ($(strip $(PKG_CPPFLAGS)),)
+  HTS_PREFIX := $(shell brew --prefix htslib 2>/dev/null)
+  ifneq ($(strip $(HTS_PREFIX)),)
+    PKG_CPPFLAGS = -I$(HTS_PREFIX)/include
+    PKG_LIBS     = -L$(HTS_PREFIX)/lib -lhts
+  endif
+endif
+
+## If still empty, leave detection to configure (below) or fail with a clear message
+
 
 .PHONY: show-flags
 show-flags:
