@@ -4,14 +4,14 @@
 
 # Try system htslib via pkg-config. If fails, fallback to Rhtslib.
 
-PKG_CPPFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null || \
-                  echo "-I\"$(RHTSLIB_INCLUDE)\"")
+# PKG_CPPFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null || \
+#                   echo "-I\"$(RHTSLIB_INCLUDE)\"")
 
-PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null || \
-                  echo "-I\"$(RHTSLIB_INCLUDE)\"")
+# PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null || \
+#                   echo "-I\"$(RHTSLIB_INCLUDE)\"")
 
-PKG_LIBS += $(shell pkg-config --libs htslib 2>/dev/null || \
-             echo "\"$(RHTSLIB_LIB)\"/libhts.a -lz -lbz2 -llzma")
+# PKG_LIBS += $(shell pkg-config --libs htslib 2>/dev/null || \
+#              echo "\"$(RHTSLIB_LIB)\"/libhts.a -lz -lbz2 -llzma")
 
 .PHONY: show-flags
 show-flags:
