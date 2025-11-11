@@ -3,6 +3,15 @@
 # CXX = /opt/homebrew/opt/llvm/bin/clang++
 
 PKG_CPPFLAGS += $(pkg-config --cflags --libs htslib)
+
 PKG_CFLAGS += $(pkg-config --cflags --libs htslib)
 
 PKG_LIBS += $(pkg-config --cflags --libs htslib)
+
+.PHONY: show-flags
+show-flags:
+	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
+	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
+	@echo "PKG_LIBS=$(PKG_LIBS)"
+	@echo "CFLAGS=$(CFLAGS)"
+	@echo "CXXFLAGS=$(CXXFLAGS)"
