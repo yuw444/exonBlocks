@@ -6,9 +6,19 @@
 PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null)
 PKG_LIBS   += $(shell pkg-config --libs   htslib 2>/dev/null)
 
+## If pkg-config yielded nothing, try environment variable HTSLIB_DIR
+ifeq ($(strip $(PKG_CPPFLAGS)),)
+  ifneq ($(strip $(HTSLIB_DIR)),)
+    PKG_CPPFLAGS += -I$(HTSLIB_DIR)/include
+    PKG_LIBS     += -L$(HTSLIB_DIR)/lib -lhts
+  endif
+endif
 
-
-.DEFAULT_GOAL := $(SHLIB)
+## Final hardcoded fallback (edit to your site)
+ifeq ($(strip $(PKG_CPPFLAGS)),)
+  PKG_CPPFLAGS += -I/hpc/apps/htslib/1.15/include
+  PKG_LIBS     += -L/hpc/apps/htslib/1.15/lib -lhts
+endif
 
 .PHONY: show-flags
 show-flags:
@@ -17,3 +27,5 @@ show-flags:
 	@echo "PKG_LIBS=$(PKG_LIBS)"
 	@echo "CFLAGS=$(CFLAGS)"
 	@echo "CXXFLAGS=$(CXXFLAGS)"
+
+.DEFAULT_GOAL := all
