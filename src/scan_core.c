@@ -5,12 +5,9 @@
 #include <htslib/kstring.h>
 
 // Convert BAM query sequence to char at qpos
-static const char nt16_table[16] = "=-ACMGRSVTWYHKDBN";
-
-/* Return the nucleotide character at query position qpos */
 static inline char base_at(const uint8_t *s, int qpos)
 {
-    return nt16_table[bam_seqi(s, qpos)];
+    return seq_nt16_str[bam_seqi(s, qpos)];
 }
 
 // Build semicolon-joined blocks from one alignment:
