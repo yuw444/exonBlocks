@@ -4,13 +4,16 @@
 
 ## Try pkg-config first
 PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null)
-PKG_LIBS     += $(shell pkg-config --libs   htslib 2>/dev/null)
+PKG_LIBS   += $(shell pkg-config --libs   htslib 2>/dev/null)
 
-# ## If still empty, leave detection to configure (below) or fail with a clear message
-# .PHONY: show-flags
-# show-flags:
-# 	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
-# 	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
-# 	@echo "PKG_LIBS=$(PKG_LIBS)"
-# 	@echo "CFLAGS=$(CFLAGS)"
-# 	@echo "CXXFLAGS=$(CXXFLAGS)"
+
+
+.DEFAULT_GOAL := $(SHLIB)
+
+.PHONY: show-flags
+show-flags:
+	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
+	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
+	@echo "PKG_LIBS=$(PKG_LIBS)"
+	@echo "CFLAGS=$(CFLAGS)"
+	@echo "CXXFLAGS=$(CXXFLAGS)"
