@@ -13,6 +13,9 @@
 # PKG_LIBS += $(shell pkg-config --libs htslib 2>/dev/null || \
 #              echo "\"$(RHTSLIB_LIB)\"/libhts.a -lz -lbz2 -llzma")
 
+PKG_CFLAGS += -I"$(RHTSLIB_INCLUDE)" -lhts
+PKG_CPPFLAGS += -I"$(RHTSLIB_INCLUDE)" -lhts
+
 .PHONY: show-flags
 show-flags:
 	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
