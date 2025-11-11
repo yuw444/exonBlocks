@@ -37,7 +37,15 @@ ifneq ($(strip $(HTSLIB_DIR)),)
   endif
 endif
 
-# 4) Common fallbacks (macOS & conda); only if still empty
+# 4) autodetect via which htsfile
+HTSFILE := $(shell which htsfile 2>/dev/null)
+ifneq ($(strip $(HTSFILE)),)
+  HTSLIB_DIR := $(shell dirname $(shell dirname $(HTSFILE)))
+  PKG_CFLAGS += -I$(HTSLIB_DIR)/include
+  PKG_LIBS     += -L$(HTSLIB_DIR)/lib -lhts
+endif
+
+# 5) Common fallbacks (macOS & conda); only if still empty
 ifeq ($(strip $(PKG_CFLAGS)),)
   # Homebrew (Apple Silicon first, then Intel)
   ifneq ("$(wildcard /opt/homebrew/include/htslib)","")
@@ -46,6 +54,10 @@ ifeq ($(strip $(PKG_CFLAGS)),)
     PKG_CFLAGS += -I/usr/local/include
   else ifneq ("$(wildcard /opt/local/include/htslib)","")
     PKG_CFLAGS += -I/opt/local/include
+  else ifneq ("$(wildcard $(HOME)/.local/include/htslib)","")
+    PKG_CFLAGS += -I$(HOME)/.local/include
+  else ifneq ("$(wildcard $(HOME)/local/include/htslib)","")
+    PKG_CFLAGS += -I$(HOME)/local/include
   else ifneq ($(strip $(CONDA_PREFIX)),)
     ifneq ("$(wildcard $(CONDA_PREFIX)/include/htslib)","")
       PKG_CFLAGS += -I$(CONDA_PREFIX)/include
@@ -60,22 +72,14 @@ ifeq ($(strip $(PKG_LIBS)),)
     PKG_LIBS   += -L/usr/local/lib -lhts
   else ifneq ("$(wildcard /opt/local/lib/libhts.*)","")
     PKG_LIBS   += -L/opt/local/lib -lhts
+  else ifneq ("$(wildcard $(HOME)/.local/lib/libhts.*)","")
+    PKG_LIBS += -L$(HOME)/.local/lib -lhts
+  else ifneq ("$(wildcard $(HOME)/local/lib/libhts.*)","")
+    PKG_LIBS += -L$(HOME)/local/lib -lhts
   else ifneq ($(strip $(CONDA_PREFIX)),)
     ifneq ("$(wildcard $(CONDA_PREFIX)/lib/libhts.*)","")
       PKG_LIBS += -L$(CONDA_PREFIX)/lib -lhts
     endif
-  endif
-endif
-
-# 5) Your HPC fallback (only if still empty)
-ifeq ($(strip $(PKG_CFLAGS)),)
-  ifneq ("$(wildcard /hpc/apps/htslib/1.15/include/htslib)","")
-    PKG_CFLAGS += -I/hpc/apps/htslib/1.15/include
-  endif
-endif
-ifeq ($(strip $(PKG_LIBS)),)
-  ifneq ("$(wildcard /hpc/apps/htslib/1.15/lib/libhts.*)","")
-    PKG_LIBS   += -L/hpc/apps/htslib/1.15/lib -lhts
   endif
 endif
 
@@ -95,7 +99,6 @@ CXXFLAGS += -Wall -O2
 ifeq ($(MAKECMDGOALS),show-flags)
 .PHONY: show-flags
 show-flags:
-	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
 	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
 	@echo "PKG_LIBS=$(PKG_LIBS)"
 	@echo "CFLAGS=$(CFLAGS)"

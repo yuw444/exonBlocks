@@ -5,8 +5,11 @@ Map cell barcode + UMI-level read blocks to overlapping exons. This repository p
 ## Requirements
 
 - R (>= 4.0)
-- R Packages: data.table, dplyr, tidyr, testthat, Rhtslib
+- R Packages: data.table, dplyr, tidyr, testthat
 - Access to an indexed BAM file
+- `htslib`
+  - Mac: `brew install htslib`
+  - Linux: check details how to compile from src at https://github.com/samtools/htslib
 
 ## Installation
 
@@ -16,9 +19,19 @@ Install required packages in R:
 if(!requireNamespace("data.table", quietly = TRUE)) install.packages("data.table")
 if(!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
 if(!requireNamespace("tidyr", quietly = TRUE)) install.packages("tidyr")
-if(!requireNamespace("Rhtslib", quietly = TRUE)) install.packages("Rhtslib")
 devtools::install_github("https://github.com/yuw444/exonBlocks")
 ```
+
+## Common Error
+
+- Couldn't find the installed `htslib`
+  - `scan_core.c:3:10: fatal error: htslib/hts.h: No such file or directory
+       3 | #include <htslib/hts.h>`
+  - `Could not find htslib headers. Set HTSLIB_DIR or install via pkg-config/Homebrew/Conda`
+
+- `Solution:` 
+  - Reinstall `htslib`, make sure the following command works in the terminal
+  `$ which htsfile`
 
 ## Example usage
 
@@ -67,3 +80,4 @@ table(df_sum$exon_ids)
 - cb_umi_exons expects `block_start`, `block_end`, `block_seq` (semicolon-delimited allowed) and `CB`, `UMI` columns in the blocks TSV.
 - meta exons file must contain columns: `chr`, `start`, `end`, `exon`.
 - The implementation uses tidyr::separate_rows to expand semicolon lists and data.table::foverlaps to detect overlaps.
+- Installation has been tested on Macos/Linux successfully, any feedback on Windows installation would be appreciated
