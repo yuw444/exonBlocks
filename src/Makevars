@@ -3,15 +3,15 @@
 # CXX = /opt/homebrew/opt/llvm/bin/clang++
 
 ## Try pkg-config first
-PKG_CFLAGS = $(shell pkg-config --cflags htslib 2>/dev/null)
-PKG_LIBS     = $(shell pkg-config --libs   htslib 2>/dev/null)
+PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null)
+PKG_LIBS     += $(shell pkg-config --libs   htslib 2>/dev/null)
 
 ## If pkg-config didn't return anything, try Homebrew (macOS arm64/intel)
 ifeq ($(strip $(PKG_CPPFLAGS)),)
   HTS_PREFIX := $(shell brew --prefix htslib 2>/dev/null)
   ifneq ($(strip $(HTS_PREFIX)),)
-    PKG_CFLAGS = -I$(HTS_PREFIX)/include
-    PKG_LIBS     = -L$(HTS_PREFIX)/lib -lhts
+    PKG_CFLAGS += -I$(HTS_PREFIX)/include
+    PKG_LIBS     += -L$(HTS_PREFIX)/lib -lhts
   endif
 endif
 
