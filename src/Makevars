@@ -2,24 +2,13 @@
 # CC = /opt/homebrew/opt/llvm/bin/clang
 # CXX = /opt/homebrew/opt/llvm/bin/clang++
 
-# Try system htslib via pkg-config. If fails, fallback to Rhtslib.
+PKG_CPPFLAGS += $(shell pkg-config --cflags htslib)
+PKG_LIBS     += $(shell pkg-config --libs htslib)
 
-# PKG_CPPFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null || \
-#                   echo "-I\"$(RHTSLIB_INCLUDE)\"")
-
-# PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null || \
-#                   echo "-I\"$(RHTSLIB_INCLUDE)\"")
-
-# PKG_LIBS += $(shell pkg-config --libs htslib 2>/dev/null || \
-#              echo "\"$(RHTSLIB_LIB)\"/libhts.a -lz -lbz2 -llzma")
-
-# PKG_CFLAGS += -lhts
-# PKG_CPPFLAGS += -lhts
-
-# .PHONY: show-flags
-# show-flags:
-# 	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
-# 	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
-# 	@echo "PKG_LIBS=$(PKG_LIBS)"
-# 	@echo "CFLAGS=$(CFLAGS)"
-# 	@echo "CXXFLAGS=$(CXXFLAGS)"
+.PHONY: show-flags
+show-flags:
+	@echo "PKG_CPPFLAGS=$(PKG_CPPFLAGS)"
+	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
+	@echo "PKG_LIBS=$(PKG_LIBS)"
+	@echo "CFLAGS=$(CFLAGS)"
+	@echo "CXXFLAGS=$(CXXFLAGS)"
