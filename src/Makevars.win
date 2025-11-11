@@ -1,0 +1,30 @@
+# Makevars.win for htslib
+
+PKG_CPPFLAGS ?=
+PKG_CFLAGS   ?=
+PKG_LIBS     ?=
+
+# Prefer explicit HTSLIB_DIR (e.g., C:/msys64/mingw64 or a custom build)
+ifneq ($(strip $(HTSLIB_DIR)),)
+  PKG_CFLAGS += -I$(HTSLIB_DIR)/include
+  PKG_LIBS   += -L$(HTSLIB_DIR)/lib -lhts
+endif
+
+# Try pkg-config if available (works inside MSYS2 shell)
+ifeq ($(strip $(PKG_CFLAGS)),)
+  PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null)
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  PKG_LIBS   += $(shell pkg-config --libs   htslib 2>/dev/null)
+endif
+
+# Fail clearly
+ifeq ($(strip $(PKG_CFLAGS)),)
+  $(error Windows: Set HTSLIB_DIR to your htslib prefix (e.g., C:/msys64/mingw64) or use MSYS2 and install htslib.)
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  $(error Windows: Could not find libhts. Ensure $(HTSLIB_DIR)/lib has libhts and toolchain can see it.)
+endif
+
+CFLAGS   += -O2 -Wall
+CXXFLAGS += -O2 -Wall
