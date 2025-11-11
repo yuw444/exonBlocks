@@ -5,7 +5,7 @@ Map cell barcode + UMI-level read blocks to overlapping exons. This repository p
 ## Requirements
 
 - R (>= 4.0)
-- Packages: data.table, dplyr, tidyr, testthat
+- R Packages: data.table, dplyr, tidyr, testthat, Rhtslib
 - Access to an indexed BAM file
 
 ## Installation
@@ -16,14 +16,15 @@ Install required packages in R:
 if(!requireNamespace("data.table", quietly = TRUE)) install.packages("data.table")
 if(!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
 if(!requireNamespace("tidyr", quietly = TRUE)) install.packages("tidyr")
+if(!requireNamespace("Rhtslib", quietly = TRUE)) install.packages("Rhtslib")
 devtools::install_github("https://github.com/yuw444/exonBlocks")
 ```
 
 ## Example usage
 
 The following example is adapted for the manuscript analyzing Tnfrsf9 (CD137) exons in single-cell RNA-seq data. It:
-1. extracts read blocks overlapping a genomic interval into a TSV (extract_exon_reads_hts),
-2. expands semicolon-delimited block fields and maps blocks to exons (cb_umi_exons),
+1. extracts read blocks overlapping a genomic interval into a TSV (`extract_exon_reads_hts`),
+2. expands semicolon-delimited block fields and maps blocks to exons (`cb_umi_exons`),
 3. summarizes exon assignments per (CB, UMI).
 
 ```r

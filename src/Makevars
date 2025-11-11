@@ -2,7 +2,7 @@
 # CC = /opt/homebrew/opt/llvm/bin/clang
 # CXX = /opt/homebrew/opt/llvm/bin/clang++
 
-PKG_CPPFLAGS = $(SHLIB_OPENMP_CFLAGS) -I/hpc/apps/htslib/1.22.1/include
-PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS)
+# PKG_CPPFLAGS = $(SHLIB_OPENMP_CFLAGS) -I/hpc/apps/htslib/1.22.1/include
+# PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS)
 
-PKG_LIBS = -L/hpc/apps/htslib/1.22.1/lib -lhts
+# PKG_LIBS = -L/hpc/apps/htslib/1.22.1/lib -lhts

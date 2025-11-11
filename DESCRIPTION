@@ -16,6 +16,8 @@ Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+LinkingTo: Rhtslib
+SystemRequirements: htslib
 Imports: data.table (>= 1.17.0), dplyr (>= 1.1.4), tidyr (>= 1.3.1), magrittr (>= 2.0.3)
 Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3
