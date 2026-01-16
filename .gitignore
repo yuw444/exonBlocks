@@ -8,4 +8,4 @@
 tests
 .Rbuildignore
 meta
-
+sub/
