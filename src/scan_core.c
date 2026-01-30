@@ -110,10 +110,12 @@ SEXP _exonBlocks_scan_bam_blocks_hts(
     SEXP end_,
     SEXP out_bam_,
     SEXP tsv_,
+    SEXP tech_,
     SEXP xf_vals_)
 {
     const char *bam_path = CHAR(STRING_ELT(bam_, 0));
     const char *chr = CHAR(STRING_ELT(chr_, 0));
+    const char *tech = CHAR(STRING_ELT(tech_, 0));
     int start = INTEGER(start_)[0];
     int end = INTEGER(end_)[0];
     const char *out_bam = CHAR(STRING_ELT(out_bam_, 0)); // "" -> skip
@@ -203,23 +205,28 @@ SEXP _exonBlocks_scan_bam_blocks_hts(
         if ((flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FSUPPLEMENTARY)) != 0)
             continue;
 
-        // xf filter
-        int okxf = 0, tagok = 0;
-        long xf = get_tagi(b, "xf", &tagok);
-        if (!tagok)
-            continue;
-        for (int i = 0; i < nxf; ++i)
-            if (xf == xf_allow[i])
-            {
-                okxf = 1;
-                break;
-            }
-        if (!okxf)
-            continue;
+        /* Only apply the xf tag filter for 10X libraries */
+        if (strcmp(tech, "10X") == 0)
+        {
+            // xf filter
+            int okxf = 0, tagok = 0;
+            long xf = get_tagi(b, "xf", &tagok);
+            if (!tagok)
+                continue;
+            for (int i = 0; i < nxf; ++i)
+                if (xf == xf_allow[i])
+                {
+                    okxf = 1;
+                    break;
+                }
+            if (!okxf)
+                continue;
+        }
 
         // CB / UB must exist
         const char *CB = get_tagZ(b, "CB");
-        const char *UB = get_tagZ(b, "UB");
+        const char *UB = strcmp(tech, "10X") == 0 ? get_tagZ(b, "UB") : get_tagZ(b, "RX");
+
         if (!CB || !UB)
             continue;
 
@@ -245,7 +252,8 @@ SEXP _exonBlocks_scan_bam_blocks_hts(
 
         // Write to filtered BAM if requested
         if (out)
-            if (sam_write1(out, hdr, b) < 0) {
+            if (sam_write1(out, hdr, b) < 0)
+            {
                 warning("Failed to write alignment to out_bam: %s", out_bam);
                 /* Close and disable further writes to avoid repeated errors */
                 sam_close(out);
@@ -275,9 +283,9 @@ SEXP _exonBlocks_scan_bam_blocks_hts(
             const char *dot = strrchr(out_bam, '.');
             if (dot && strcmp(dot, ".bam") == 0)
             {
-            int rc = sam_index_build3(out_bam, NULL, 0, 0);
-            if (rc != 0)
-                warning("Failed to build BAI for %s (sam_index_build3 rc=%d)", out_bam, rc);
+                int rc = sam_index_build3(out_bam, NULL, 0, 0);
+                if (rc != 0)
+                    warning("Failed to build BAI for %s (sam_index_build3 rc=%d)", out_bam, rc);
             }
         }
     }
@@ -288,7 +296,8 @@ SEXP _exonBlocks_scan_bam_blocks_hts(
     sam_close(in);
 
     SEXP ans = PROTECT(allocVector(INTSXP, 1));
-    INTEGER(ans)[0] = (int)n_reads;
+    INTEGER(ans)
+    [0] = (int)n_reads;
     UNPROTECT(1);
     return ans;
 }

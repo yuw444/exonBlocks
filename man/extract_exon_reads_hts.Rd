@@ -11,7 +11,8 @@ extract_exon_reads_hts(
   end,
   out_bam,
   tsv,
-  xf_values = c(25L, 17L)
+  xf_values = c(25L, 17L),
+  tech = "10X"
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ extract_exon_reads_hts(
 \item{tsv}{Path to TSV to write}
 
 \item{xf_values}{integer vector; default c(25L,17L)}
+
+\item{tech}{Character; sequencing technology, one of "10X(default)", "Smart-seq"}
 }
 \description{
 htslib-core extractor (fast path)

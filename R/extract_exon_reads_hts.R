@@ -7,12 +7,31 @@
 #' @param out_bam Path for filtered BAM to write (or NULL to skip)
 #' @param tsv Path to TSV to write
 #' @param xf_values integer vector; default c(25L,17L)
+#' @param tech Character; sequencing technology, one of "10X(default)", "Smart-seq"
 #' @export
-extract_exon_reads_hts <- function(bam, chr, start, end, out_bam, tsv,
-                                   xf_values = c(25L,17L)) {
-  if (is.null(out_bam)) out_bam <- ""
-  stopifnot(file.exists(bam), nzchar(chr), start <= end)
-  .Call(`_exonBlocks_scan_bam_blocks_hts`,
-        bam, chr, as.integer(start), as.integer(end),
-        out_bam, tsv, as.integer(xf_values))
+extract_exon_reads_hts <- function(
+      bam,
+      chr,
+      start,
+      end,
+      out_bam,
+      tsv,
+      xf_values = c(25L, 17L),
+      tech = "10X"
+) {
+      if (is.null(out_bam)) {
+            out_bam <- ""
+      }
+      stopifnot(file.exists(bam), nzchar(chr), start <= end)
+      .Call(
+            `_exonBlocks_scan_bam_blocks_hts`,
+            bam,
+            chr,
+            as.integer(start),
+            as.integer(end),
+            out_bam,
+            tsv,
+            tech,
+            as.integer(xf_values)
+      )
 }
