@@ -4,8 +4,9 @@
 .httr-oauth
 .DS_Store
 .quarto
-.vscode
-tests
+# .vscode
+# tests
+..Rcheck
 .Rbuildignore
 meta
 sub/

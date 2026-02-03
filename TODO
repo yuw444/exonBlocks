@@ -1,0 +1,8 @@
+
+1. Group the exons, find the one with most coverage to present the Group
+2. Cell * Exon matrix
+3. how to normalize based on the exon length
+4. do the clustering, new clustering identification
+5. Do DE on genes, with distribution shift (Function Regression would help)
+6. Write a package
+    Fork Seurat: do Seurat+
