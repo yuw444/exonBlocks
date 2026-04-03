@@ -168,3 +168,57 @@ save_cluster_index <- function(exon_clusters, path, overwrite = FALSE) {
     message("Cluster index saved to: ", path)
     invisible(NULL)
 }
+
+
+#' Extract Unique Tag Values from BAM File
+#'
+#' @description
+#' Scans a BAM file and extracts all unique values for a specified tag.
+#' Uses OpenMP parallel scanning across contigs with thread-local hash tables.
+#'
+#' @param bam Path to input BAM/CRAM file (must be indexed)
+#' @param tag Two-character tag name (e.g., "CB" for cell barcode,
+#'   "UB" for UMI, "GX" for gene ID)
+#' @param threads Number of threads for parallel scanning (default: auto-detect)
+#' @return Character vector of unique tag values found in the BAM file
+#' @export
+#' @examples
+#' \dontrun{
+#' # Extract all unique cell barcodes
+#' cb_list <- extract_unique_tags(
+#'   bam = "possorted_genome_bam.bam",
+#'   tag = "CB"
+#' )
+#' length(cb_list)  # Number of unique cell barcodes
+#'
+#' # Extract with 8 threads
+#' cb_list <- extract_unique_tags(
+#'   bam = "possorted_genome_bam.bam",
+#'   tag = "CB",
+#'   threads = 8
+#' )
+#'
+#' # Extract all unique UMIs
+#' umi_list <- extract_unique_tags(
+#'   bam = "possorted_genome_bam.bam",
+#'   tag = "UB"
+#' )
+#'
+#' # Extract gene IDs (if present)
+#' gene_list <- extract_unique_tags(
+#'   bam = "possorted_genome_bam.bam",
+#'   tag = "GX"
+#' )
+#' }
+extract_unique_tags <- function(bam, tag, threads = 0) {
+    stopifnot(file.exists(bam))
+    stopifnot(nchar(tag) == 2)
+    if (threads < 0) threads <- 0
+
+    .Call(
+        `_exonBlocks_extract_unique_tags`,
+        bam,
+        tag,
+        as.integer(threads)
+    )
+}

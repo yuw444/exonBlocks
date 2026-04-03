@@ -1,4 +1,6 @@
 #include "exonblocks_shared.h"
+#include "hashtable.h"
+#include <omp.h>
 
 // ============================================================================
 // Build semicolon-joined blocks from one alignment
@@ -296,6 +298,284 @@ static int find_first_overlap(int *cluster_end, int n_clusters, int block_start)
         }
     }
     return lo;
+}
+
+// ============================================================================
+// Extract unique tag values from BAM file using OpenMP parallel scanning
+// ============================================================================
+
+// Thread-local result structure for parallel scanning
+typedef struct {
+    hash_table *ht;
+    size_t n_tags;
+} ThreadResult;
+
+// Hash function for tag strings (DJB2)
+static uint64_t hash_tag(const char *str, size_t len) {
+    uint64_t hash = 5381;
+    for (size_t i = 0; i < len; i++) {
+        hash = ((hash << 5) + hash) + str[i];
+    }
+    return hash;
+}
+
+// Forward declaration - scan reads for one contig and populate thread-local hashtable
+static ThreadResult scan_contig(
+    htsFile *in,
+    hts_idx_t *idx,
+    bam_hdr_t *hdr,
+    const char *contig_name,
+    int contig_tid,
+    const char *tag,
+    long start,
+    long end);
+
+// Merge thread-local hashtables into a single result
+static SEXP merge_results(ThreadResult *results, int n_threads);
+
+// ============================================================================
+// Main function: extract unique tags using OpenMP parallel contig scanning
+// Inputs: bam_path, tag_name, n_threads (0 = auto-detect)
+// ============================================================================
+SEXP _exonBlocks_extract_unique_tags(
+    SEXP bam_,
+    SEXP tag_,
+    SEXP threads_)
+{
+    const char *bam_path = CHAR(STRING_ELT(bam_, 0));
+    const char *tag = CHAR(STRING_ELT(tag_, 0));
+    int requested_threads = INTEGER(threads_)[0];
+
+    // Open BAM file
+    htsFile *in = sam_open(bam_path, "r");
+    if (!in) {
+        error("Failed to open BAM file: %s", bam_path);
+    }
+
+    bam_hdr_t *hdr = sam_hdr_read(in);
+    if (!hdr) {
+        sam_close(in);
+        error("Failed to read BAM header");
+    }
+
+    // Load index
+    hts_idx_t *idx = sam_index_load(in, bam_path);
+    if (!idx) {
+        bam_hdr_destroy(hdr);
+        sam_close(in);
+        error("No BAM index found for: %s", bam_path);
+    }
+
+    // Get number of contigs from header
+    int n_contigs = hdr->n_targets;
+
+    // Determine number of threads
+    int n_threads;
+    if (requested_threads > 0) {
+        n_threads = requested_threads;
+    } else {
+        n_threads = omp_get_max_threads();
+    }
+    if (n_threads < 1) n_threads = 1;
+    // Limit threads to number of contigs
+    if (n_threads > n_contigs) n_threads = n_contigs;
+
+    // Allocate array of thread results
+    ThreadResult *results = (ThreadResult*)malloc(n_threads * sizeof(ThreadResult));
+    if (!results) {
+        hts_idx_destroy(idx);
+        bam_hdr_destroy(hdr);
+        sam_close(in);
+        error("Failed to allocate thread results");
+    }
+    for (int i = 0; i < n_threads; i++) {
+        results[i].ht = NULL;
+        results[i].n_tags = 0;
+    }
+
+    // =========================================================================
+    // Parallel section: each thread processes a subset of contigs
+    // =========================================================================
+    #pragma omp parallel num_threads(n_threads)
+    {
+        int thread_id = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
+
+        // Each thread processes contigs in a round-robin fashion
+        for (int contig_idx = thread_id; contig_idx < n_contigs; contig_idx += num_threads) {
+            const char *contig_name = hdr->target_name[contig_idx];
+            long contig_start = 0;
+            long contig_end = hdr->target_len[contig_idx];
+
+            // Scan this contig with thread-local hashtable
+            ThreadResult result = scan_contig(in, idx, hdr, contig_name, contig_idx, tag, contig_start, contig_end);
+
+            // Merge into thread's accumulator (first result becomes the accumulator)
+            #pragma omp critical
+            {
+                if (results[thread_id].ht == NULL) {
+                    results[thread_id].ht = result.ht;
+                    results[thread_id].n_tags = result.n_tags;
+                } else if (result.ht != NULL) {
+                    // Merge result.ht into results[thread_id].ht
+                    for (uint32_t i = 0; i < result.ht->size; i++) {
+                        entry *e = result.ht->elements[i];
+                        while (e != NULL) {
+                            if (hash_table_insert(results[thread_id].ht, e->key, (void*)1)) {
+                                results[thread_id].n_tags++;
+                            }
+                            e = e->next;
+                        }
+                    }
+                    hash_table_destroy(result.ht);
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Merge all thread results into final result
+    // =========================================================================
+    SEXP result = merge_results(results, n_threads);
+
+    // Cleanup
+    free(results);
+    hts_idx_destroy(idx);
+    bam_hdr_destroy(hdr);
+    sam_close(in);
+
+    return result;
+}
+
+// ============================================================================
+// Scan all reads for a specific contig
+// ============================================================================
+static ThreadResult scan_contig(
+    htsFile *in,
+    hts_idx_t *idx,
+    bam_hdr_t *hdr,
+    const char *contig_name,
+    int contig_tid,
+    const char *tag,
+    long start,
+    long end)
+{
+    ThreadResult result = {NULL, 0};
+
+    // Create thread-local hash table
+    result.ht = hash_table_create(1 << 18, hash_tag, free);  // 256K buckets per thread
+    if (!result.ht) {
+        return result;
+    }
+
+    // Create iterator for this contig
+    hts_itr_t *itr = sam_itr_queryi(idx, contig_tid, start, end);
+    if (!itr) {
+        hash_table_destroy(result.ht);
+        result.ht = NULL;
+        return result;
+    }
+
+    bam1_t *b = bam_init1();
+
+    // Process all reads in this contig
+    while (sam_itr_next(in, itr, b) >= 0) {
+        // Skip unmapped/secondary/supplementary
+        uint16_t flag = b->core.flag;
+        if ((flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FSUPPLEMENTARY)) != 0) {
+            continue;
+        }
+
+        // Get the tag
+        uint8_t *tagp = bam_aux_get(b, tag);
+        if (!tagp) {
+            continue;
+        }
+
+        const char *tag_value = bam_aux2Z(tagp);
+        if (!tag_value || tag_value[0] == '\0') {
+            continue;
+        }
+
+        // Insert into thread-local hash table
+        if (hash_table_insert(result.ht, tag_value, (void*)1)) {
+            result.n_tags++;
+        }
+    }
+
+    bam_destroy1(b);
+    hts_itr_destroy(itr);
+
+    return result;
+}
+
+// ============================================================================
+// Merge thread-local results into a single R character vector
+// ============================================================================
+static SEXP merge_results(ThreadResult *results, int n_threads) {
+    // First pass: count total unique tags and find the result with most entries
+    size_t total_tags = 0;
+    int best_thread = 0;
+    size_t best_count = 0;
+
+    for (int i = 0; i < n_threads; i++) {
+        if (results[i].ht) {
+            total_tags += results[i].n_tags;
+            if (results[i].n_tags > best_count) {
+                best_count = results[i].n_tags;
+                best_thread = i;
+            }
+        }
+    }
+
+    if (total_tags == 0) {
+        // Return empty character vector
+        for (int i = 0; i < n_threads; i++) {
+            if (results[i].ht) {
+                hash_table_destroy(results[i].ht);
+            }
+        }
+        SEXP result = PROTECT(allocVector(STRSXP, 0));
+        UNPROTECT(1);
+        return result;
+    }
+
+    // Use the largest hashtable as the base and merge others into it
+    hash_table *final_ht = results[best_thread].ht;
+    results[best_thread].ht = NULL;  // Prevent destruction below
+
+    for (int i = 0; i < n_threads; i++) {
+        if (i == best_thread) continue;
+        if (results[i].ht == NULL) continue;
+
+        // Merge into final hashtable
+        for (uint32_t j = 0; j < results[i].ht->size; j++) {
+            entry *e = results[i].ht->elements[j];
+            while (e != NULL) {
+                hash_table_insert(final_ht, e->key, (void*)1);
+                e = e->next;
+            }
+        }
+        hash_table_destroy(results[i].ht);
+    }
+
+    // Create result character vector
+    SEXP result = PROTECT(allocVector(STRSXP, total_tags));
+
+    // Extract unique values from final hash table
+    size_t result_idx = 0;
+    for (uint32_t i = 0; i < final_ht->size && result_idx < total_tags; i++) {
+        entry *e = final_ht->elements[i];
+        while (e != NULL && result_idx < total_tags) {
+            SET_STRING_ELT(result, result_idx, mkChar(e->key));
+            result_idx++;
+            e = e->next;
+        }
+    }
+
+    hash_table_destroy(final_ht);
+    UNPROTECT(1);
+    return result;
 }
 
 // [[.Call]] entry: maps blocks TSV to exon clusters, outputs triplet format.

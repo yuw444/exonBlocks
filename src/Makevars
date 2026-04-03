@@ -92,8 +92,9 @@ ifeq ($(strip $(PKG_LIBS)),)
 endif
 
 ## Optional: tighten compilation (works fine with Clang and GCC)
-CFLAGS   += -Wall -O2
-CXXFLAGS += -Wall -O2
+CFLAGS   += -Wall -O2 -fopenmp
+CXXFLAGS += -Wall -O2 -fopenmp
+LDFLAGS  += -fopenmp
 
 ## Helper to print resolved flags (safe; won’t hijack builds)
 ifeq ($(MAKECMDGOALS),show-flags)
