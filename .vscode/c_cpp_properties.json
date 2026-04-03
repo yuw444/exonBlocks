@@ -4,9 +4,8 @@
       "name": "R/C - exonBlocks",
       "includePath": [
         "${workspaceFolder}/**",
-        "/hpc/apps/R/4.5.0/lib64/R/include",
-        "/usr/share/R/include",
-        "/hpc/apps/htslib/1.22.1/include"
+        "/home/yu89975/micromamba/envs/exonBlock/lib/R/include",
+        "/home/yu89975/micromamba/envs/exonBlock/include"
       ],
       "defines": [
         "__STDC__",
@@ -14,7 +13,7 @@
       ],
       "compilerPath": "/usr/bin/gcc",
       "cStandard": "c11",
-      "intelliSenseMode": "linux-clang"
+      "intelliSenseMode": "linux-gcc-x64"
     }
   ],
   "version": 4

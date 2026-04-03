@@ -13,7 +13,7 @@
     },
     {
       "label": "R: Run Tests",
-      "type": "shell", 
+      "type": "shell",
       "command": "R -e 'devtools::test()'",
       "problemMatcher": ["$gcc"],
       "group": "test",
@@ -40,10 +40,13 @@
       }
     },
     {
-      "label": "C: Compile with clangd",
+      "label": "C: Syntax Check",
       "type": "shell",
-      "command": "clangd check src/*.c --",
-      "problemMatcher": ["$gcc"]
+      "command": "gcc -fsyntax-only -c ${file} -I/home/yu89975/micromamba/envs/exonBlock/lib/R/include -I/home/yu89975/micromamba/envs/exonBlock/include -I${workspaceFolder}/src",
+      "problemMatcher": ["$gcc"],
+      "presentation": {
+        "reveal": "always"
+      }
     }
   ]
 }

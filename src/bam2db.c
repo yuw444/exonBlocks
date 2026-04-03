@@ -1,4 +1,6 @@
-#include "bam2db_ds.h"
+#include "bam2db.h"
+#include "mt19937ar.h"
+#include "utils.h"
 
 int _umi_copies_flag = 0;
 

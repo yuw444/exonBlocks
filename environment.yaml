@@ -1,0 +1,28 @@
+name: exonBlock
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.4
+  - r-seurat=5.4.0
+  - r-signac=1.16.0
+  - r-ggplot2
+  - r-patchwork
+  - r-harmony=1.2.4
+  - r-future
+  - r-dplyr
+  - bioconductor-genomeinfodb
+  - bioconductor-glmgampoi
+  - bioconductor-iranges
+  - bioconductor-genomicfeatures
+  - r-biocmanager
+  - r-devtools
+  - r-data.table
+  - r-scam
+  - r-monocle3
+  - radian
+  - gcc
+  - htslib
+  - cmake
+  - openmp
+

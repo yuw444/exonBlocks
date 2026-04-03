@@ -10,3 +10,4 @@
 .Rbuildignore
 meta
 sub/
+env/

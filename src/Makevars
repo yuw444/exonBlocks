@@ -1,3 +1,7 @@
+## ---- Explicit source files ---------------------------------------------------
+SOURCES = init.c scan_core.c scan_core_stream.c hashtable.c bam2db.c mt19937ar.c utils.c
+OBJECTS = $(SOURCES:.c=.o)
+
 ## ---- User override via environment ---------------------------------------
 ## Allow users/CI to predefine HTSLIB_DIR, HTSLIB_CFLAGS, HTSLIB_LIBS.
 ## These take highest precedence if non-empty.
@@ -90,6 +94,9 @@ endif
 ifeq ($(strip $(PKG_LIBS)),)
   $(error Could not find htslib library. Set HTSLIB_DIR or install via pkg-config/Homebrew/Conda.)
 endif
+
+## ---- SQLite3 (required by bam2db_ds.c) ---------------------------------------
+PKG_LIBS += -lsqlite3
 
 ## Optional: tighten compilation (works fine with Clang and GCC)
 CFLAGS   += -Wall -O2 -fopenmp

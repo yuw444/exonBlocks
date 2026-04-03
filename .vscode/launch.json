@@ -1,0 +1,74 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) C Extension Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/home/yu89975/micromamba/envs/exonBlock/lib/R/bin/exec/R",
+            "args": [
+                "--vanilla",
+                "-e",
+                "library(exonBlocks); devtools::test()"
+            ],
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "R_HOME",
+                    "value": "/home/yu89975/micromamba/envs/exonBlock/lib/R"
+                },
+                {
+                    "name": "PATH",
+                    "value": "${env:PATH}:/home/yu89975/micromamba/envs/exonBlock/bin"
+                },
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "/home/yu89975/micromamba/envs/exonBlock/lib:/home/yu89975/micromamba/envs/exonBlock/lib/R/lib:${env:LD_LIBRARY_PATH}"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/hpc/apps/gdb/12.1/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "R: Install Package",
+            "stopAtEntry": false,
+            "logging": {
+                "moduleLoad": false,
+                "engineLogging": false,
+                "programOutput": true,
+                "exceptions": true
+            }
+        },
+        {
+            "name": "(gdb) Attach to R Process",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/home/yu89975/micromamba/envs/exonBlock/lib/R/bin/exec/R",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/hpc/apps/gdb/12.1/bin/gdb",
+            "processId": "${command:pickProcess}",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "R: Debug Current Test File",
+            "type": "r-debug",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/testthat/${relativeFile}",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "debugMode": "test_file"
+        }
+    ]
+}
