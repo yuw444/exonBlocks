@@ -1,5 +1,5 @@
 ## ---- Explicit source files ---------------------------------------------------
-SOURCES = init.c scan_core.c scan_core_stream.c hashtable.c bam2db.c mt19937ar.c utils.c
+SOURCES = init.c scan_core.c scan_core_stream.c hashtable.c bam2db.c bam2db_wrapper.c mt19937ar.c utils.c
 OBJECTS = $(SOURCES:.c=.o)
 
 ## ---- User override via environment ---------------------------------------

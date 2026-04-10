@@ -4,3 +4,4 @@
 ^src/AGENTS\.md$
 ^R/AGENTS\.md$
 ^tests/AGENTS\.md$
+^meta/bam/

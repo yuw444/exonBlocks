@@ -2,49 +2,36 @@
 #include "mt19937ar.h"
 #include "utils.h"
 
-int _umi_copies_flag = 0;
+/* ── DNA encoding ────────────────────────────────────────────────────────── */
 
 uint8_t encode_base(char base)
 {
-    switch (base)
-    {
-    case 'A':
-        return 0b00;
-    case 'C':
-        return 0b01;
-    case 'G':
-        return 0b10;
-    case 'T':
-        return 0b11;
-    default:
-        return BYTE_MASK; // unknown base
+    switch (base) {
+    case 'A': return 0b00;
+    case 'C': return 0b01;
+    case 'G': return 0b10;
+    case 'T': return 0b11;
+    default:  return BYTE_MASK;
     }
 }
 
 uint8_t *encode_DNA(const char *DNA_seq)
 {
-    // str length can be checked by strlen as string is ended with '\0'
     uint16_t len_DNA = strlen(DNA_seq);
-    // plus 1 for the end of string if like to print it out
-    uint8_t *encoded_DNA = (uint8_t *)calloc((len_DNA + BYTE_SIZE / BASE_BITS - 1) / 4 + 1, sizeof(uint8_t));
-    if (encoded_DNA == NULL)
-    {
-        return NULL;
-    }
+    uint8_t *encoded_DNA = (uint8_t *)calloc((len_DNA + BYTE_SIZE / BASE_BITS - 1) / BASE_BITS + 1, sizeof(uint8_t));
+    if (!encoded_DNA) return NULL;
+
     uint8_t *p = encoded_DNA;
     int bit_index = BYTE_SIZE - BASE_BITS;
-    for (size_t i = 0; i < len_DNA; i++)
-    {
+    for (size_t i = 0; i < len_DNA; i++) {
         uint8_t base = encode_base(DNA_seq[i]);
-        if (base == BYTE_MASK)
-        {
+        if (base == BYTE_MASK) {
             free(encoded_DNA);
-            return NULL; // unknown base
+            return NULL;
         }
         *p |= (base & BASE_MASK) << bit_index;
         bit_index -= BASE_BITS;
-        if (bit_index < 0)
-        {
+        if (bit_index < 0) {
             bit_index = BYTE_SIZE - BASE_BITS;
             p++;
         }
@@ -54,569 +41,643 @@ uint8_t *encode_DNA(const char *DNA_seq)
 
 char *decode_DNA(uint8_t *encoded_DNA, size_t n)
 {
-    // plus 1 for the end of string '\0'
     char *decoded_DNA = (char *)calloc(n + 1, sizeof(char));
+    if (!decoded_DNA) return NULL;
     decoded_DNA[n] = '\0';
-    if (decoded_DNA == NULL)
-    {
-        return NULL;
-    }
+
     char *p = decoded_DNA;
     int bit_index = BYTE_SIZE - BASE_BITS;
-    for (size_t i = 0; i < n; i++)
-    {
-        uint8_t base = (encoded_DNA[i / 4] >> bit_index) & BASE_MASK;
-        switch (base)
-        {
-        case 0b00:
-            *p = 'A';
-            break;
-        case 0b01:
-            *p = 'C';
-            break;
-        case 0b10:
-            *p = 'G';
-            break;
-        case 0b11:
-            *p = 'T';
-            break;
+    for (size_t i = 0; i < n; i++) {
+        uint8_t base = (encoded_DNA[i / BASE_BITS] >> bit_index) & BASE_MASK;
+        switch (base) {
+        case 0b00: *p = 'A'; break;
+        case 0b01: *p = 'C'; break;
+        case 0b10: *p = 'G'; break;
+        case 0b11: *p = 'T'; break;
         default:
             free(decoded_DNA);
-            return NULL; // unknown base
+            return NULL;
         }
         bit_index -= BASE_BITS;
         if (bit_index < 0)
-        {
             bit_index = BYTE_SIZE - BASE_BITS;
-        }
         p++;
     }
     return decoded_DNA;
 }
 
-// hash function
-uint64_t hash(const char *str, size_t len)
+/* ── Internal helpers ────────────────────────────────────────────────────── */
+
+static uint64_t hash_djb2(const char *str, size_t len)
 {
-    uint64_t hash = 5381;
-
-    for (int i = 0; i < len; i++)
-        hash = ((hash << 5) + hash) + str[i]; /* hash * 33 + c */
-
-    return hash;
+    uint64_t h = 5381;
+    for (size_t i = 0; i < len; i++)
+        h = ((h << 5) + h) + (uint64_t)(unsigned char)str[i];
+    return h;
 }
+
+static int exec_sql(sqlite3 *db, const char *sql)
+{
+    char *err = NULL;
+    int rc = sqlite3_exec(db, sql, NULL, 0, &err);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", err);
+        sqlite3_free(err);
+    }
+    return rc;
+}
+
+/* ── Protocol filter ─────────────────────────────────────────────────────── */
+
+static int protocol_filter(const bam1_t *rec, protocol_t proto)
+{
+    switch (proto) {
+    case PROTO_10X: {
+        uint8_t *xf = bam_aux_get(rec, "xf");
+        if (!xf) return 0;
+        int q = bam_aux2i(xf);
+        return (q == 17 || q == 25);
+    }
+    case PROTO_ZUMIS:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/* ── Identity extraction ─────────────────────────────────────────────────── */
+
+static read_identity extract_identity(const bam1_t *rec, protocol_t proto)
+{
+    read_identity id = {NULL, NULL};
+    switch (proto) {
+    case PROTO_10X: {
+        uint8_t *cb = bam_aux_get(rec, "CB");
+        uint8_t *ub = bam_aux_get(rec, "UB");
+        if (cb && ub) {
+            id.cb = bam_aux2Z(cb);
+            id.umi = bam_aux2Z(ub);
+        }
+        break;
+    }
+    case PROTO_ZUMIS: {
+        uint8_t *bx = bam_aux_get(rec, "BX");
+        uint8_t *ub = bam_aux_get(rec, "UB");
+        if (bx && ub) {
+            id.cb = bam_aux2Z(bx);
+            id.umi = bam_aux2Z(ub);
+        }
+        break;
+    }
+    }
+    return id;
+}
+
+/* ── CIGAR block extraction ──────────────────────────────────────────────── */
+
+typedef struct {
+    hts_pos_t start;
+    hts_pos_t end;
+} aligned_block;
+
+static int extract_blocks(const bam1_t *rec, aligned_block *blocks, int max_blocks)
+{
+    int n = 0;
+    uint32_t *cigar = bam_get_cigar(rec);
+    int n_cigar = rec->core.n_cigar;
+    hts_pos_t pos = rec->core.pos;
+
+    for (int i = 0; i < n_cigar && n < max_blocks; i++) {
+        int op = bam_cigar_op(cigar[i]);
+        int len = bam_cigar_oplen(cigar[i]);
+
+        if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
+            blocks[n].start = pos + 1;
+            blocks[n].end = pos + len;
+            n++;
+            pos += len;
+        } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
+            pos += len;
+        } else if (op == BAM_CINS || op == BAM_CSOFT_CLIP) {
+            /* don't advance */
+        } else if (op == BAM_CHARD_CLIP) {
+            /* nothing */
+        } else if (op == BAM_CPAD) {
+            pos += len;
+        }
+    }
+    return n;
+}
+
+/* ── Region overlap ──────────────────────────────────────────────────────── */
+
+static int bsearch_chr(const region_registry *reg, const char *chr)
+{
+    int lo = 0, hi = (int)reg->n_chr - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        int c = strcmp(chr, reg->chr_names[mid]);
+        if (c == 0) return mid;
+        if (c < 0) hi = mid - 1;
+        else lo = mid + 1;
+    }
+    return -1;
+}
+
+static size_t find_region_overlaps(const bam1_t *rec,
+                                    const bam_hdr_t *hdr,
+                                    const region_registry *reg,
+                                    size_t *out_indexes, size_t max_out)
+{
+    if (!reg || reg->n == 0) return 0;
+    if (rec->core.tid < 0) return 0;
+
+    const char *chr = hdr->target_name[rec->core.tid];
+    int cid = bsearch_chr(reg, chr);
+    if (cid < 0) return 0;
+
+    /* Extract CIGAR blocks */
+    aligned_block blocks[128];
+    int n_blocks = extract_blocks(rec, blocks, 128);
+    if (n_blocks == 0) return 0;
+
+    size_t n_out = 0;
+    size_t offset = reg->chr_first[cid];
+    size_t count = reg->chr_count[cid];
+
+    for (int b = 0; b < n_blocks; b++) {
+        for (size_t i = 0; i < count; i++) {
+            const region_t *r = &reg->items[offset + i];
+            if (blocks[b].end < r->start) break;
+            if (blocks[b].start > r->end) continue;
+
+            /* Check for duplicate region_index */
+            int dup = 0;
+            for (size_t j = 0; j < n_out; j++) {
+                if (out_indexes[j] == (offset + i + 1)) { dup = 1; break; }
+            }
+            if (dup) continue;
+
+            if (n_out < max_out) {
+                out_indexes[n_out] = offset + i + 1;
+                n_out++;
+            }
+        }
+    }
+    return n_out;
+}
+
+/* ── Phase: load cell barcodes ───────────────────────────────────────────── */
+
+static int load_cells(sqlite3 *db, const char *barcodes_file,
+                      float rate_cell, unsigned int seed,
+                      hash_table **out_ht, size_t *out_n_sampled)
+{
+    gzFile fp = gzopen(barcodes_file, "r");
+    if (!fp) {
+        fprintf(stderr, "ERROR: Cannot open barcode file %s\n", barcodes_file);
+        return 1;
+    }
+
+    size_t cap = 4096, n = 0;
+    char **cells = (char **)malloc(cap * sizeof(char *));
+    if (!cells) { gzclose(fp); return 1; }
+
+    char buf[MAX_LINE_LENGTH];
+    while (gzgets(fp, buf, sizeof(buf)) != NULL) {
+        buf[strcspn(buf, "\n\r\t")] = '\0';
+        if (strlen(buf) == 0) continue;
+        if (n >= cap) {
+            cap *= 2;
+            cells = (char **)realloc(cells, cap * sizeof(char *));
+            if (!cells) { gzclose(fp); return 1; }
+        }
+        cells[n] = strdup(buf);
+        if (!cells[n]) { gzclose(fp); return 1; }
+        n++;
+    }
+    gzclose(fp);
+    fprintf(stderr, "Total cell barcodes loaded: %zu\n", n);
+
+    if (n == 0) { free(cells); return 1; }
+
+    size_t n_sampled = (size_t)(n * rate_cell);
+    if (n_sampled > n) n_sampled = n;
+    if (n_sampled == 0) n_sampled = 1;
+
+    size_t *seq = GetSeqInt(0, n - 1, 1);
+    size_t *idx = SampleInt(seq, n, n_sampled, 0, seed);
+    free(seq);
+    qsort(idx, n_sampled, sizeof(size_t), vsI);
+
+    hash_table *ht = hash_table_create((uint32_t)(n_sampled * 2), hash_djb2, free);
+    if (!ht) { free(idx); free(cells); return 1; }
+
+    if (exec_sql(db, "CREATE TABLE cell (cell_barcode TEXT);") != SQLITE_OK) {
+        hash_table_destroy(ht); free(idx); free(cells); return 1;
+    }
+
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, "INSERT INTO cell VALUES (?1);", -1, &stmt, NULL) != SQLITE_OK) {
+        hash_table_destroy(ht); free(idx); free(cells); return 1;
+    }
+
+    exec_sql(db, "BEGIN TRANSACTION");
+    size_t cell_index = 1;
+    for (size_t i = 0; i < n_sampled; i++) {
+        size_t ci = idx[i];
+        size_t *idx_ptr = (size_t *)calloc(1, sizeof(size_t));
+        if (!idx_ptr) continue;
+        *idx_ptr = cell_index;
+
+        if (hash_table_insert(ht, cells[ci], idx_ptr)) {
+            sqlite3_bind_text(stmt, 1, cells[ci], -1, SQLITE_TRANSIENT);
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+            cell_index++;
+        } else {
+            free(idx_ptr);
+        }
+    }
+    exec_sql(db, "END TRANSACTION");
+    sqlite3_finalize(stmt);
+
+    *out_ht = ht;
+    *out_n_sampled = cell_index - 1;
+
+    for (size_t i = 0; i < n; i++) free(cells[i]);
+    free(cells);
+    free(idx);
+    return 0;
+}
+
+/* ── Phase: load regions ─────────────────────────────────────────────────── */
+
+static int load_regions(sqlite3 *db, const char *regions_file,
+                        region_registry **out_reg)
+{
+    region_registry *reg = region_registry_build(regions_file);
+    if (!reg) return 1;
+
+    if (exec_sql(db, "CREATE TABLE region (region_index INTEGER PRIMARY KEY, id TEXT, symbol TEXT, chr TEXT, start INTEGER, end INTEGER, annotation1 TEXT, annotation2 TEXT);") != SQLITE_OK) {
+        region_registry_destroy(reg);
+        return 1;
+    }
+
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, "INSERT INTO region VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);", -1, &stmt, NULL) != SQLITE_OK) {
+        region_registry_destroy(reg);
+        return 1;
+    }
+
+    exec_sql(db, "BEGIN TRANSACTION");
+    for (size_t i = 0; i < reg->n; i++) {
+        sqlite3_bind_int(stmt, 1, (int)(i + 1));
+        sqlite3_bind_text(stmt, 2, reg->items[i].id, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, reg->items[i].symbol, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 4, reg->items[i].chr, -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 5, (int)reg->items[i].start);
+        sqlite3_bind_int(stmt, 6, (int)reg->items[i].end);
+        sqlite3_bind_text(stmt, 7, reg->items[i].annotation1 ? reg->items[i].annotation1 : "", -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 8, reg->items[i].annotation2 ? reg->items[i].annotation2 : "", -1, SQLITE_STATIC);
+        sqlite3_step(stmt);
+        sqlite3_reset(stmt);
+    }
+    exec_sql(db, "END TRANSACTION");
+    sqlite3_finalize(stmt);
+
+    fprintf(stderr, "Regions loaded: %zu\n", reg->n);
+    *out_reg = reg;
+    return 0;
+}
+
+/* ── Region query struct ─────────────────────────────────────────────────── */
+
+typedef struct {
+    int enabled;
+    const char *chr;
+    hts_pos_t start;
+    hts_pos_t end;
+} region_query;
+
+/* ── Phase: process BAM reads ────────────────────────────────────────────── */
+
+static int process_bam(sqlite3 *db, const char *bam_file,
+                       hash_table *ht_cell,
+                       const region_registry *reg,
+                       float rate_depth, unsigned int seed,
+                       protocol_t proto,
+                       const region_query *roi,
+                       size_t *out_total, size_t *out_sampled, size_t *out_valid)
+{
+    samFile *bam = sam_open(bam_file, "r");
+    if (!bam) {
+        fprintf(stderr, "ERROR: Cannot open BAM file %s\n", bam_file);
+        return 1;
+    }
+
+    bam_hdr_t *hdr = sam_hdr_read(bam);
+    if (!hdr) {
+        fprintf(stderr, "ERROR: Cannot read BAM header from %s\n", bam_file);
+        hts_close(bam);
+        return 1;
+    }
+
+    bam1_t *rec = bam_init1();
+    if (!rec) {
+        bam_hdr_destroy(hdr);
+        hts_close(bam);
+        return 1;
+    }
+
+    init_genrand(seed);
+
+    if (exec_sql(db, "CREATE TABLE umi (cell_index INTEGER, region_index INTEGER, encoded_umi BLOB, umi_len INTEGER);") != SQLITE_OK) {
+        bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam); return 1;
+    }
+
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, "INSERT INTO umi VALUES (?1, ?2, ?3, ?4);", -1, &stmt, NULL) != SQLITE_OK) {
+        bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam); return 1;
+    }
+
+    exec_sql(db, "BEGIN TRANSACTION");
+
+    size_t total = 0, sampled = 0, valid = 0;
+    size_t region_indexes[128];
+
+    /* Build chr name → tid map for ROI filtering */
+    int roi_tid = -1;
+    if (roi && roi->enabled) {
+        roi_tid = bam_name2id(hdr, roi->chr);
+        if (roi_tid < 0) {
+            fprintf(stderr, "ERROR: Unknown contig '%s' in BAM %s\n", roi->chr, bam_file);
+            sqlite3_finalize(stmt);
+            exec_sql(db, "END TRANSACTION");
+            bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam);
+            return 1;
+        }
+    }
+
+    /* Decide iteration mode */
+    int use_iterator = (roi && roi->enabled);
+    hts_itr_t *itr = NULL;
+    if (use_iterator) {
+        hts_idx_t *idx = sam_index_load(bam, bam_file);
+        if (!idx) {
+            fprintf(stderr, "ERROR: No index found for %s (region query requires .bai)\n", bam_file);
+            sqlite3_finalize(stmt);
+            exec_sql(db, "END TRANSACTION");
+            bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam);
+            return 1;
+        }
+        itr = sam_itr_queryi(idx, roi_tid, roi->start, roi->end);
+        hts_idx_destroy(idx);
+        if (!itr) {
+            fprintf(stderr, "ERROR: Failed to create iterator for %s:%ld-%ld\n",
+                    roi->chr, (long)roi->start, (long)roi->end);
+            sqlite3_finalize(stmt);
+            exec_sql(db, "END TRANSACTION");
+            bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam);
+            return 1;
+        }
+        fprintf(stderr, "Querying region %s:%ld-%ld\n", roi->chr,
+                (long)roi->start, (long)roi->end);
+    }
+
+    int ret_code = 0;
+    while (1) {
+        int read_ok = use_iterator ? sam_itr_next(bam, itr, rec) : sam_read1(bam, hdr, rec);
+        if (read_ok < 0) break;
+
+        total++;
+
+        /* ROI filter: skip reads outside target chr */
+        if (roi && roi->enabled && rec->core.tid != roi_tid) continue;
+
+        /* Protocol-specific quality filter */
+        if (!protocol_filter(rec, proto)) continue;
+
+        /* Extract cell barcode + UMI */
+        read_identity id = extract_identity(rec, proto);
+        if (!id.cb || !id.umi) continue;
+
+        /* Cell barcode lookup */
+        void *cell_lookup = hash_table_lookup(ht_cell, id.cb);
+        if (!cell_lookup) continue;
+        size_t cell_index = *(size_t *)cell_lookup;
+
+        /* Depth subsampling */
+        if (genrand_real1() >= rate_depth) continue;
+        sampled++;
+
+        /* Region overlap */
+        size_t n_ov = find_region_overlaps(rec, hdr, reg, region_indexes, 128);
+        if (n_ov == 0) continue;
+
+        /* Encode UMI */
+        uint8_t *encoded = encode_DNA(id.umi);
+        if (!encoded) continue;
+        size_t enc_size = (strlen(id.umi) + BYTE_SIZE / BASE_BITS - 1) / BASE_BITS;
+
+        for (size_t k = 0; k < n_ov; k++) {
+            sqlite3_bind_int(stmt, 1, (int)cell_index);
+            sqlite3_bind_int(stmt, 2, (int)region_indexes[k]);
+            sqlite3_bind_blob(stmt, 3, encoded, (int)enc_size, NULL);
+            sqlite3_bind_int(stmt, 4, (int)strlen(id.umi));
+
+            if (sqlite3_step(stmt) == SQLITE_DONE)
+                valid++;
+
+            sqlite3_reset(stmt);
+        }
+
+        free(encoded);
+    }
+
+    exec_sql(db, "END TRANSACTION");
+    sqlite3_finalize(stmt);
+
+    if (use_iterator && itr) hts_itr_destroy(itr);
+
+    fprintf(stderr, "BAM %s: total=%zu, sampled=%zu, valid=%zu\n",
+            bam_file, total, sampled, valid);
+
+    *out_total = total;
+    *out_sampled = sampled;
+    *out_valid = valid;
+
+    bam_destroy1(rec);
+    bam_hdr_destroy(hdr);
+    hts_close(bam);
+    return ret_code;
+}
+
+/* ── Phase: generate 10x output ──────────────────────────────────────────── */
+
+static int generate_10x(sqlite3 *db, const char *path_out,
+                        const char *bam_file,
+                        float rate_cell, float rate_depth,
+                        size_t total, size_t sampled, size_t valid,
+                        int umi_copies_flag)
+{
+    char path[1024];
+
+    snprintf(path, sizeof(path), "%s/barcodes.tsv.gz", path_out);
+    gzFile f_bc = gzopen(path, "wb");
+    if (!f_bc) { fprintf(stderr, "ERROR: cannot open %s\n", path); return 1; }
+
+    snprintf(path, sizeof(path), "%s/features.tsv.gz", path_out);
+    gzFile f_ft = gzopen(path, "wb");
+    if (!f_ft) { gzclose(f_bc); fprintf(stderr, "ERROR: cannot open %s\n", path); return 1; }
+
+    snprintf(path, sizeof(path), "%s/matrix.mtx.gz", path_out);
+    gzFile f_mx = gzopen(path, "wb");
+    if (!f_mx) { gzclose(f_bc); gzclose(f_ft); fprintf(stderr, "ERROR: cannot open %s\n", path); return 1; }
+
+    if (exec_sql(db,
+        "CREATE TABLE mtx AS "
+        "SELECT region_index, cell_index, COUNT(DISTINCT encoded_umi) AS expression_level "
+        "FROM umi GROUP BY cell_index, region_index;") != SQLITE_OK) {
+        gzclose(f_bc); gzclose(f_ft); gzclose(f_mx); return 1;
+    }
+
+    size_t n_mtx = nrow_sql_table(db, "mtx");
+    size_t n_bc  = nrow_sql_table(db, "cell");
+    size_t n_ft  = nrow_sql_table(db, "region");
+
+    gzprintf(f_mx,
+        "%%MatrixMarket matrix coordinate integer general\n"
+        "%%%%\t\"parent_bam\": \"%s\",\n"
+        "%%%%\t\"rate_cell\": %.3f,\n"
+        "%%%%\t\"rate_depth\": %.3f,\n"
+        "%%%%\t\"total_n_reads\": %zu,\n"
+        "%%%%\t\"sampled_n_reads\": %zu,\n"
+        "%%%%\t\"valid_n_reads\": %zu\n",
+        bam_file, rate_cell, rate_depth, total, sampled, valid);
+    gzprintf(f_mx, "%zu %zu %zu\n", n_ft, n_bc, n_mtx);
+
+    table2gz(db, "mtx", f_mx, 0, " ");
+    table2gz(db, "cell", f_bc, 0, "\n");
+    table2gz(db, "region", f_ft, 0, "\t");
+
+    gzclose(f_bc);
+    gzclose(f_ft);
+    gzclose(f_mx);
+
+    if (umi_copies_flag) {
+        if (exec_sql(db,
+            "CREATE TABLE numi AS "
+            "SELECT region_index, cell_index, encoded_umi, umi_len, COUNT(*) AS n_copy "
+            "FROM umi GROUP BY cell_index, region_index, encoded_umi;") != SQLITE_OK)
+            return 1;
+
+        snprintf(path, sizeof(path), "%s/umi.tsv.gz", path_out);
+        gzFile f_umi = gzopen(path, "wb");
+        if (f_umi) {
+            table2gz(db, "numi", f_umi, 0, "\t");
+            gzclose(f_umi);
+        }
+    }
+
+    return 0;
+}
+
+/* ── Public API ──────────────────────────────────────────────────────────── */
 
 int bam2db(
     char *bam_file,
     char *db_file,
     char *path_out,
     char *barcodes_file,
-    char *features_file,
+    char *regions_file,
     float rate_cell,
     float rate_depth,
-    unsigned int seed)
+    unsigned int seed,
+    int umi_copies_flag,
+    protocol_t protocol,
+    const char *region_chr,
+    hts_pos_t region_start,
+    hts_pos_t region_end)
 {
-    sqlite3 *db;
-    char *zErrMsg = 0;
-    int rc;
-    char *sql;
-    sqlite3_stmt *stmt;
-
-    init_genrand(seed);
-    double rand_cell;
-    double rand_depth;
-
-    // open database
-    rc = sqlite3_open(db_file, &db);
-    if (rc)
-    {
-        fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-        sqlite3_free(zErrMsg);
-        sqlite3_close(db);
+    if (rate_cell <= 0.0f || rate_cell > 1.0f) {
+        fprintf(stderr, "ERROR: rate_cell must be in (0, 1], got %f\n", rate_cell);
         return 1;
     }
-    else
-    {
-        fprintf(stderr, "Opened database successfully\n");
-    }
-
-    // open bam file
-    samFile *bam = sam_open(bam_file, "r");
-    if (bam == NULL)
-    {
-        fprintf(stderr, "Fail to open BAM file %s\n", bam_file);
+    if (rate_depth <= 0.0f || rate_depth > 1.0f) {
+        fprintf(stderr, "ERROR: rate_depth must be in (0, 1], got %f\n", rate_depth);
         return 1;
     }
-    else
-    {
-        fprintf(stderr, "Opened BAM file %s successfully\n", bam_file);
-    }
 
-    // open cell barcode file
-    gzFile cell_barcode_fp = gzopen(barcodes_file, "r");
-    if (cell_barcode_fp == NULL)
-    {
-        fprintf(stderr, "Fail to open cell barcode file %s\n", barcodes_file);
-        return 1;
-    }
-    else
-    {
-        fprintf(stderr, "Opened cell barcode file %s successfully\n", barcodes_file);
-    }
+    sqlite3 *db = NULL;
+    hash_table *ht_cell = NULL;
+    region_registry *reg = NULL;
+    int ret = 1;
 
-    // open feature name file
-    gzFile feature = gzopen(features_file, "r");
-    if (feature == NULL)
-    {
-        fprintf(stderr, "Fail to open feature name file %s\n", features_file);
-        return 1;
-    }
-    else
-    {
-        fprintf(stderr, "Opened feature name file %s successfully\n", features_file);
-    }
+    region_query roi;
+    roi.enabled = (region_chr != NULL && region_chr[0] != '\0');
+    roi.chr = region_chr;
+    roi.start = region_start;
+    roi.end = region_end;
 
-    // create cell table
-    sql = "CREATE TABLE cell (cell_barcode TEXT);";
-    rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
-
-    if (rc != SQLITE_OK)
-    {
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        sqlite3_free(zErrMsg);
+    if (sqlite3_open(db_file, &db) != SQLITE_OK) {
+        fprintf(stderr, "ERROR: Cannot open/create database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return 1;
     }
 
-    // create feature table
-    sql = "CREATE TABLE feature (feature_id TEXT, feature_name TEXT, feature_type);";
-    rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
-
-    if (rc != SQLITE_OK)
-    {
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        sqlite3_free(zErrMsg);
-        sqlite3_close(db);
-        return 1;
-    }
-
-    // create umi table
-    sql = "CREATE TABLE umi (cell_index INTEGER, feature_index INTEGER, encoded_umi TEXT);";
-    rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
-
-    if (rc != SQLITE_OK)
-    {
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        sqlite3_free(zErrMsg);
-        sqlite3_close(db);
-        return 1;
-    }
-
-    // create hash table for cell barcode
-    hash_table *ht_cell = hash_table_create(1 << 20, hash, NULL);
-    if (ht_cell == NULL)
-    {
-        fprintf(stderr, "ERROR: Cannot create hash table for cell barcode\n");
-        return 1;
-    }
-
-    // create hash table for gene
-    hash_table *ht_feature = hash_table_create(1 << 20, hash, NULL);
-    if (ht_feature == NULL)
-    {
-        fprintf(stderr, "ERROR: Cannot create hash table for feature\n");
-        return 1;
-    }
-
-    // read cell barcode file and insert into hash table and database
-    char *cell_barcode_buffer = (char *)malloc(1024 * sizeof(char));
-
-    // total number of cells
     size_t n_cells = 0;
-    while (gzgets(cell_barcode_fp, cell_barcode_buffer, 1024) != NULL)
-    {
-        n_cells++;
-    }
-    printf("Total number of cells: %zu\n", n_cells);
+    if (load_cells(db, barcodes_file, rate_cell, seed, &ht_cell, &n_cells) != 0)
+        goto cleanup;
 
-    // get desired cell_indexes and sort
-    size_t *cell_index_seq = GetSeqInt(0, n_cells - 1, 1);
-    size_t n_cells_sampled = (size_t)(n_cells * rate_cell);
-    size_t *cell_sample_indexes = SampleInt(cell_index_seq, n_cells, n_cells_sampled, 0, seed);
-    free(cell_index_seq);
-    qsort(cell_sample_indexes, n_cells_sampled, sizeof(size_t), vsI);
-    // PrintArrayInt(cell_sample_indexes, n_cells_sampled);
-    printf("Actual number of sampled cell barcodes: %zu\n", n_cells_sampled);
-    // reset file pointer
-    gzrewind(cell_barcode_fp);
-    size_t cell_index = 1;
-    size_t nth_cellbarcode = 0;
+    if (load_regions(db, regions_file, &reg) != 0)
+        goto cleanup;
 
-    sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &zErrMsg);
-    sql = "INSERT INTO cell VALUES (?1);";
-    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-    while (gzgets(cell_barcode_fp, cell_barcode_buffer, 1024) != NULL && cell_index <= n_cells_sampled)
-    {
+    size_t total = 0, sampled = 0, valid = 0;
+    if (process_bam(db, bam_file, ht_cell, reg, rate_depth, seed,
+                    protocol, &roi, &total, &sampled, &valid) != 0)
+        goto cleanup;
 
-        nth_cellbarcode++;
+    if (generate_10x(db, path_out, bam_file, rate_cell, rate_depth,
+                     total, sampled, valid, umi_copies_flag) != 0)
+        goto cleanup;
 
-        if (nth_cellbarcode - 1 != cell_sample_indexes[cell_index - 1])
-        {
-            continue;
-        }
+    ret = 0;
 
-        cell_barcode_buffer[strcspn(cell_barcode_buffer, "\n\r\t")] = '\0';
-        size_t *cell_index_ptr = (size_t *)calloc(1, sizeof(size_t));
-        *cell_index_ptr = cell_index;
-        if (hash_table_insert(ht_cell, cell_barcode_buffer, cell_index_ptr))
-        {
-            sqlite3_bind_text(stmt, 1, cell_barcode_buffer, strlen(cell_barcode_buffer), SQLITE_STATIC);
-            if (sqlite3_step(stmt) != SQLITE_DONE)
-            {
-                fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
-                sqlite3_free(zErrMsg);
-                sqlite3_close(db);
-                return 1;
-            }
-            sqlite3_reset(stmt);
-            cell_index++;
-        }
-        else
-        {
-            printf("Warning: Duplicate cell barcodes were found in %s!\n", barcodes_file);
-            free(cell_index_ptr);
-        }
-    }
-    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &zErrMsg);
-    sqlite3_finalize(stmt);
-    gzclose(cell_barcode_fp);
-    // printf("Total number of sampled cell barcodes: %zu\n", cell_index -1);
-    free(cell_barcode_buffer);
-    free(cell_sample_indexes);
-
-    // read feature name file and insert into hash table and database
-
-    char *feature_buffer = (char *)calloc(1024, sizeof(char));
-    char *feature_id, *feature_name, *feature_type;
-    int feature_index = 1;
-    int *feature_index_ptr = NULL;
-
-    sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &zErrMsg);
-    sql = "INSERT INTO feature VALUES (?1, ?2, ?3);";
-    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-    while (gzgets(feature, feature_buffer, 1024) != NULL)
-    {
-        feature_id = strtok(feature_buffer, "\t");
-        feature_name = strtok(NULL, "\t");
-        feature_type = strtok(NULL, "\t");
-        feature_type[strcspn(feature_type, "\n\r\t")] = '\0';
-        feature_index_ptr = (int *)calloc(1, sizeof(int));
-        *feature_index_ptr = feature_index;
-
-        if (hash_table_insert(ht_feature, feature_buffer, feature_index_ptr))
-        {
-            sqlite3_bind_text(stmt, 1, feature_id, strlen(feature_id), SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 2, feature_name, strlen(feature_name), SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 3, feature_type, strlen(feature_type), SQLITE_STATIC);
-            if (sqlite3_step(stmt) != SQLITE_DONE)
-            {
-                fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
-                sqlite3_free(zErrMsg);
-                sqlite3_close(db);
-                return 1;
-            }
-            sqlite3_reset(stmt);
-            feature_index++;
-        }
-        else
-        {
-            printf("Warning: Duplicate feature names were found in %s!\n", features_file);
-        }
-    }
-
-    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &zErrMsg);
-    sqlite3_finalize(stmt);
-    gzclose(feature);
-    free(feature_buffer);
-
-    /*********convert bam file to sqlite3 database***********/
-    bam_hdr_t *bam_header = sam_hdr_read(bam);
-    bam1_t *bam_record = bam_init1();
-    size_t total_reads_counts = 0;
-    size_t sampled_reads_counts = 0;
-    size_t sampled_valid_reads_counts = 0;
-    // time_t t = time(NULL);
-    // struct tm *tm;
-    // char s[64];
-
-    printf("Start to convert bam file to sqlite3 database...\n");
-    sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &zErrMsg);
-    sql = "INSERT INTO umi VALUES (?1, ?2, ?3);";
-    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-
-    uint8_t *cell_barcode_ptr, *xf_ptr, *gx_ptr, *ub_ptr, *encoded_UMI;
-    char *cell_barcode, *feature_ID, *UMI;
-    void *temp1, *temp2;
-    int UMI_quality;
-    size_t encoded_size;
-
-    while (sam_read1(bam, bam_header, bam_record) >= 0)
-    {
-
-        total_reads_counts++;
-
-        // check if CB tag exists
-        cell_barcode_ptr = bam_aux_get(bam_record, "CB");
-
-        if (cell_barcode_ptr == NULL)
-        {
-            continue;
-        }
-
-        // check if CB tag is in the cell barcode hash table
-        cell_barcode = bam_aux2Z(cell_barcode_ptr);
-        temp1 = hash_table_lookup(ht_cell, cell_barcode);
-
-        if (temp1 == NULL)
-        {
-            continue;
-        }
-
-        size_t cell_index = *(size_t *)temp1;
-
-        // only if current CB in the CB hash table, then downsample the read depth
-        rand_depth = genrand_real1();
-
-        if (rand_depth >= rate_depth)
-        {
-            continue;
-        }
-
-        sampled_reads_counts++;
-        // check if UMI quality is 25
-        xf_ptr = bam_aux_get(bam_record, "xf");
-        UMI_quality = bam_aux2i(xf_ptr);
-
-        if (!(UMI_quality == 25 || UMI_quality == 17))
-        {
-            continue;
-        }
-
-        // if quality is 25, GX tag must exist, check the feature index
-        gx_ptr = bam_aux_get(bam_record, "GX");
-        feature_ID = bam_aux2Z(gx_ptr);
-        temp2 = hash_table_lookup(ht_feature, feature_ID);
-
-        if (temp2 == NULL)
-        {
-            continue;
-        }
-        feature_index = *(int *)temp2;
-        ub_ptr = bam_aux_get(bam_record, "UB");
-        if (ub_ptr == NULL)
-        {
-            continue;
-        }
-        UMI = bam_aux2Z(ub_ptr);
-        encoded_UMI = encode_DNA(UMI);
-        encoded_size = (strlen(UMI) + BYTE_SIZE / BASE_BITS - 1) / 4;
-
-        sqlite3_bind_int(stmt, 1, cell_index);
-        sqlite3_bind_int(stmt, 2, feature_index);
-        // sqlite3_bind_text(stmt, 3, encoded_UMI, strlen(encoded_UMI), SQLITE_STATIC);
-        sqlite3_bind_blob(stmt, 3, encoded_UMI, encoded_size, SQLITE_STATIC);
-
-        if (sqlite3_step(stmt) != SQLITE_DONE)
-        {
-            fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
-            sqlite3_free(zErrMsg);
-            sqlite3_close(db);
-            return 1;
-        }
-
-        sqlite3_reset(stmt);
-        sampled_valid_reads_counts++;
-
-        free(encoded_UMI);
-    }
-
-    sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &zErrMsg);
-    sqlite3_finalize(stmt);
-
-    printf("In %s, total fastQ reads: %zu\n", bam_file, total_reads_counts);
-    printf("In %s, sampled fastQ reads: %zu\n", bam_file, sampled_reads_counts);
-    printf("In %s, sampled and valid fastQ reads: %zu\n", bam_file, sampled_valid_reads_counts);
-
-    bam_destroy1(bam_record);
-    bam_hdr_destroy(bam_header);
-    hts_close(bam);
-
-    /*********convert sqlite3 database to 10x output***********/
-    // file path of output
-    char *path_barcode = (char *)malloc(1024 * sizeof(char));
-    sprintf(path_barcode, "%s/barcodes.tsv.gz", path_out);
-    gzFile file_barcode = gzopen(path_barcode, "wb");
-    if (file_barcode == NULL)
-    {
-        fprintf(stderr, "\x1b[31mError:\x1b[0m can not open file %s\n", path_barcode);
-        return 1;
-    }
-    char *path_feature = (char *)malloc(1024 * sizeof(char));
-    sprintf(path_feature, "%s/features.tsv.gz", path_out);
-    gzFile file_feature = gzopen(path_feature, "wb");
-    if (file_feature == NULL)
-    {
-        fprintf(stderr, "\x1b[31mError:\x1b[0m can not open file %s\n", path_feature);
-        return 1;
-    }
-    char *path_matrix = (char *)malloc(1024 * sizeof(char));
-    sprintf(path_matrix, "%s/matrix.mtx.gz", path_out);
-    gzFile file_matrix = gzopen(path_matrix, "wb");
-    if (file_matrix == NULL)
-    {
-        fprintf(stderr, "\x1b[31mError:\x1b[0m can not open file %s\n", path_matrix);
-        return 1;
-    }
-
-
-    // create summary table of umi
-    sql = "CREATE TABLE mtx AS "
-          "SELECT feature_index, cell_index, COUNT(DISTINCT encoded_umi) AS expression_level "
-          " FROM umi "
-          " GROUP BY cell_index, feature_index;";
-    if (sqlite3_exec(db, sql, NULL, 0, &zErrMsg) != SQLITE_OK)
-    {
-        fprintf(stderr, "\x1b[31mError:\x1b[0m SQL error: %s\n", zErrMsg);
-        sqlite3_free(zErrMsg);
-        return 1;
-    }
-
-    // get the number of rows of every table
-    size_t nrow_mtx = nrow_sql_table(db, "mtx");
-    size_t nrow_barcode = nrow_sql_table(db, "cell");
-    size_t nrow_feature = nrow_sql_table(db, "feature");
-
-    // write the nrows to the header of matrix.mtx.gz
-    char *header = (char *)malloc(1024 * sizeof(char));
-    gzprintf(
-        file_matrix,
-        "%%%MatrixMarket matrix coordinate integer general\n"
-        "%%metadata_json: \n"
-        "%%{\n"
-        "%%\t\"software_version\": \"fastF-1.0.0\",\n"
-        "%%\t\"format_version\": 1,\n"
-        "%%\t\"parent_bam\": \"%s\",\n"
-        "%%\t\"rate_cell\": %.3f,\n"
-        "%%\t\"rate_depth\": %.3f,\n"
-        "%%\t\"total_n_FastQ\": %zu,\n"
-        "%%\t\"sampled_n_FastQ\": %zu,\n"
-        "%%\t\"sampled_valid_n_FastQ\": %zu\n"
-        "%%}\n",
-        bam_file, rate_cell, rate_depth, total_reads_counts, sampled_reads_counts, sampled_valid_reads_counts);
-    gzprintf(file_matrix, "%zu %zu %zu\n", nrow_feature, nrow_barcode, nrow_mtx);
-
-    // write table mtx to matrix.mtx.gz
-    table2gz(db, "mtx", file_matrix, 0, " ");
-    printf("matrix.mtx.gz is generated.\n");
-
-    // write table cell to barcodes.tsv.gz
-    table2gz(db, "cell", file_barcode, 0, " ");
-    printf("barcodes.tsv.gz is generated.\n");
-
-    // write table feature to features.tsv.gz
-    table2gz(db, "feature", file_feature, 0, "\t");
-    printf("features.tsv.gz is generated.\n");
-
-    if (_umi_copies_flag)
-    {
-        char *path_umi = (char *)malloc(1024 * sizeof(char));
-        sprintf(path_umi, "%s/umi.tsv.gz", path_out);
-        gzFile file_umi = gzopen(path_umi, "wb");
-        if (file_umi == NULL)
-        {
-            fprintf(stderr, "\x1b[31mError:\x1b[0m can not open file %s\n", path_umi);
-            return 1;
-        }
-
-        // creat umi summary table of for cell, feature, umi
-        sql = "CREATE TABLE numi AS "
-              "SELECT feature_index, cell_index, encoded_umi, COUNT(*) AS n_copy "
-              " FROM umi "
-              " GROUP BY cell_index, feature_index, encoded_umi;";
-
-        if (sqlite3_exec(db, sql, NULL, 0, &zErrMsg) != SQLITE_OK)
-        {
-            fprintf(stderr, "\x1b[31mError:\x1b[0m SQL error: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
-            return 1;
-        }
-
-        // write table numi to umi.tsv.gz
-        table2gz(db, "numi", file_umi, 0, "\t");
-        printf("umi.tsv.gz is generated.\n");
-        free(path_umi);
-        gzclose(file_umi);
-    }
-
-    free(path_barcode);
-    free(path_feature);
-    free(path_matrix);
-    free(header);
-
-    gzclose(file_barcode);
-    gzclose(file_feature);
-    gzclose(file_matrix);
-
-    sqlite3_close(db);
-
-    hash_table_destroy(ht_cell);
-    hash_table_destroy(ht_feature);
-
-    return 0;
+cleanup:
+    if (ht_cell)  hash_table_destroy(ht_cell);
+    if (reg)      region_registry_destroy(reg);
+    if (db)       sqlite3_close(db);
+    return ret;
 }
 
-int table2gz(
-    sqlite3 *db_handle,
-    const char *table_name,
-    gzFile gz_file_ptr,
-    unsigned int header,
-    const char *delim)
-{
-    char *sql = malloc(1024 * sizeof(char));
+/* ── Utility: dump table to gzipped file ─────────────────────────────────── */
 
-    // prepare the sql statement
-    sprintf(sql, "SELECT * FROM %s;", table_name);
+int table2gz(sqlite3 *db_handle, const char *table_name,
+             gzFile gz_file_ptr, unsigned int header, const char *delim)
+{
+    char sql[1024];
+    snprintf(sql, sizeof(sql), "SELECT * FROM %s;", table_name);
+
     sqlite3_stmt *stmt;
-    if (sqlite3_prepare_v2(db_handle, sql, -1, &stmt, NULL) != SQLITE_OK)
-    {
+    if (sqlite3_prepare_v2(db_handle, sql, -1, &stmt, NULL) != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db_handle));
-        gzclose(gz_file_ptr);
         return 1;
     }
 
-    // get the number of columns
-    int column_count = sqlite3_column_count(stmt);
+    int ncols = sqlite3_column_count(stmt);
 
-    if (header == 1)
-    {
-        for (int i = 0; i < column_count; i++)
-        {
+    if (header) {
+        for (int i = 0; i < ncols; i++) {
             gzprintf(gz_file_ptr, "%s", sqlite3_column_name(stmt, i));
-            if (i < column_count - 1)
-            {
-                gzprintf(gz_file_ptr, "%s", delim);
-            }
+            if (i < ncols - 1) gzprintf(gz_file_ptr, "%s", delim);
         }
-
         gzprintf(gz_file_ptr, "\n");
     }
 
-    // loop through the rows
-    while (sqlite3_step(stmt) == SQLITE_ROW)
-    {
-        for (int i = 0; i < column_count; i++)
-        {
-            switch (sqlite3_column_type(stmt, i))
-            {
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        for (int i = 0; i < ncols; i++) {
+            switch (sqlite3_column_type(stmt, i)) {
             case SQLITE_INTEGER:
                 gzprintf(gz_file_ptr, "%d", sqlite3_column_int(stmt, i));
                 break;
@@ -626,66 +687,54 @@ int table2gz(
             case SQLITE_TEXT:
                 gzprintf(gz_file_ptr, "%s", sqlite3_column_text(stmt, i));
                 break;
-            case SQLITE_BLOB:
-            {
-                char *decoded_UMI = decode_DNA((uint8_t *)sqlite3_column_blob(stmt, i), 10);
-                gzprintf(gz_file_ptr, "%s", decoded_UMI);
-                free(decoded_UMI);
+            case SQLITE_BLOB: {
+                int blob_len = sqlite3_column_bytes(stmt, i);
+                const uint8_t *blob = (const uint8_t *)sqlite3_column_blob(stmt, i);
+                if (strcmp(table_name, "numi") == 0 && i == 2) {
+                    int umi_len = sqlite3_column_int(stmt, 3);
+                    char *decoded = decode_DNA((uint8_t *)blob, (size_t)umi_len);
+                    if (decoded) { gzprintf(gz_file_ptr, "%s", decoded); free(decoded); }
+                    else gzprintf(gz_file_ptr, "NULL");
+                } else if (strcmp(table_name, "umi") == 0 && i == 2) {
+                    int umi_len = sqlite3_column_int(stmt, 3);
+                    char *decoded = decode_DNA((uint8_t *)blob, (size_t)umi_len);
+                    if (decoded) { gzprintf(gz_file_ptr, "%s", decoded); free(decoded); }
+                    else gzprintf(gz_file_ptr, "NULL");
+                } else {
+                    gzprintf(gz_file_ptr, "<BLOB:%d>", blob_len);
+                }
                 break;
             }
             default:
-                gzprintf(gz_file_ptr, "%s", "NULL");
+                gzprintf(gz_file_ptr, "NULL");
                 break;
             }
-            if (i < column_count - 1)
-            {
-                gzprintf(gz_file_ptr, "%s", delim);
-            }
+            if (i < ncols - 1) gzprintf(gz_file_ptr, "%s", delim);
         }
         gzprintf(gz_file_ptr, "\n");
     }
 
     sqlite3_finalize(stmt);
-    // gzclose(gz_file_ptr);
-    free(sql);
     return 0;
 }
 
-// get the number of rows in a table of sqlite3 database
-size_t nrow_sql_table(
-    sqlite3 *db_handle,
-    const char *table_name)
+/* ── Utility: row count ──────────────────────────────────────────────────── */
+
+size_t nrow_sql_table(sqlite3 *db_handle, const char *table_name)
 {
-    char *err_msg = NULL;
-    int rc;
+    char sql[256];
+    snprintf(sql, sizeof(sql), "SELECT COUNT(*) FROM %s;", table_name);
+
     sqlite3_stmt *stmt;
-
-    char *sql = malloc(1024 * sizeof(char));
-    sprintf(sql, "SELECT COUNT(*) FROM %s;", table_name);
-
-    rc = sqlite3_prepare_v2(db_handle, sql, -1, &stmt, NULL);
-
-    if (rc != SQLITE_OK)
-    {
-        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db_handle));
-        sqlite3_close(db_handle);
+    if (sqlite3_prepare_v2(db_handle, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db_handle));
         return 0;
     }
 
-    rc = sqlite3_step(stmt);
-
-    if (rc != SQLITE_ROW)
-    {
-        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db_handle));
-        sqlite3_close(db_handle);
-        return 0;
-    }
-
-    size_t nrow = sqlite3_column_int(stmt, 0);
+    size_t nrow = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        nrow = (size_t)sqlite3_column_int(stmt, 0);
 
     sqlite3_finalize(stmt);
-
-    free(sql);
-
     return nrow;
 }
