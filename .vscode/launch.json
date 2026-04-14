@@ -5,7 +5,7 @@
             "name": "(gdb) C Extension Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/home/yu89975/micromamba/envs/exonBlock/lib/R/bin/exec/R",
+            "program": "${workspaceFolder}/.pixi/envs/default/lib/R/bin/exec/R",
             "args": [
                 "--vanilla",
                 "-e",
@@ -15,20 +15,20 @@
             "environment": [
                 {
                     "name": "R_HOME",
-                    "value": "/home/yu89975/micromamba/envs/exonBlock/lib/R"
+                    "value": "${workspaceFolder}/.pixi/envs/default/lib/R"
                 },
                 {
                     "name": "PATH",
-                    "value": "${env:PATH}:/home/yu89975/micromamba/envs/exonBlock/bin"
+                    "value": "${env:PATH}:${workspaceFolder}/.pixi/envs/default/bin"
                 },
                 {
                     "name": "LD_LIBRARY_PATH",
-                    "value": "/home/yu89975/micromamba/envs/exonBlock/lib:/home/yu89975/micromamba/envs/exonBlock/lib/R/lib:${env:LD_LIBRARY_PATH}"
+                    "value": "${workspaceFolder}/.pixi/envs/default/lib:${workspaceFolder}/.pixi/envs/default/lib/R/lib:${env:LD_LIBRARY_PATH}"
                 }
             ],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "/hpc/apps/gdb/12.1/bin/gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -49,9 +49,9 @@
             "name": "(gdb) Attach to R Process",
             "type": "cppdbg",
             "request": "attach",
-            "program": "/home/yu89975/micromamba/envs/exonBlock/lib/R/bin/exec/R",
+            "program": "${workspaceFolder}/.pixi/envs/default/lib/R/bin/exec/R",
             "MIMode": "gdb",
-            "miDebuggerPath": "/hpc/apps/gdb/12.1/bin/gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "processId": "${command:pickProcess}",
             "setupCommands": [
                 {

@@ -1,28 +1,41 @@
 {
     "terminal.integrated.env.linux": {
-        "PATH": "${env:PATH}:/home/yu89975/.local/bin:/opt/slurm/bin/",
-        "LD_LIBRARY_PATH": "/opt/slurm/lib64/:${env:LD_LIBRARY_PATH}",
-        "R_HOME": "/home/yu89975/micromamba/envs/exonBlock/lib/R"
+        "PATH": "${env:PATH}:${workspaceFolder}/.pixi/envs/default/bin",
+        "LD_LIBRARY_PATH": "${workspaceFolder}/.pixi/envs/default/lib:${workspaceFolder}/.pixi/envs/default/lib/R/lib:${env:LD_LIBRARY_PATH}",
+        "R_HOME": "${workspaceFolder}/.pixi/envs/default/lib/R"
     },
-    "r.rpath.linux": "/home/yu89975/micromamba/envs/exonBlock/bin/R",
-    "r.rterm.linux": "/home/yu89975/micromamba/envs/exonBlock/bin/radian",
+    "r.rpath.linux": "${workspaceFolder}/.pixi/envs/default/bin/R",
+    "r.rterm.linux": "${workspaceFolder}/.pixi/envs/default/bin/radian",
     "r.rterm.option": [
         "--no-save",
         "--no-restore"
     ],
-    "r.plot.useHttpgd": true,
-    "r.libPaths": [
-        "/home/yu89975/micromamba/envs/exonBlock/lib/R/library"
-    ],
     "r.bracketedPaste": true,
+    "r.sessionWatcher": true,
+    "r.plot.useHttpgd": false,
+    "r.libPaths": [
+        "${workspaceFolder}/.pixi/envs/default/lib/R/library"
+    ],
+    "[r]": {
+        "editor.formatOnSave": true
+    },
+    "files.exclude": {
+        ".pixi": true,
+        ".Rprofile": true,
+        "tmp/": true
+    },
+    "search.exclude": {
+        ".pixi": true,
+        "tmp/": true
+    },
     "C_Cpp.default.compilerPath": "/usr/bin/gcc",
     "C_Cpp.default.includePath": [
         "/usr/include",
         "/usr/local/include",
         "/usr/include/c++/11",
         "/usr/lib/gcc/x86_64-linux-gnu/11/include",
-        "/home/yu89975/micromamba/envs/exonBlock/lib/R/include",
-        "/home/yu89975/micromamba/envs/exonBlock/include",
-        "${workspaceFolder}/**"
+        "${workspaceFolder}/.pixi/envs/default/lib/R/include",
+        "${workspaceFolder}/.pixi/envs/default/include",
+        "${workspaceFolder}/src"
     ]
 }
