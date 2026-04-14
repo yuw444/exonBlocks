@@ -52,23 +52,23 @@ R -e 'devtools::document()'
 
 # C syntax check (micromamba paths)
 gcc -fsyntax-only -c src/scan_core.c \
-    -I/home/yu89975/micromamba/envs/exonBlock/lib/R/include \
-    -I/home/yu89975/micromamba/envs/exonBlock/include \
+    -I/home/yu-wang/micromamba/envs/exonBlock/lib/R/include \
+    -I/home/yu-wang/micromamba/envs/exonBlock/include \
     -Isrc
 
 # C syntax check (HPC module paths, if using R/4.5.0)
 gcc -fsyntax-only -c src/scan_core.c \
-    -I/hpc/apps/R/4.5.0/lib64/R/include \
-    -I/hpc/apps/htslib/1.22.1/include \
+    -I/usr/lib/R/lib64/R/include \
+    -I/usr/local/include \
     -Isrc
 ```
 
 ## KEY PATHS
 | Component | Path (micromamba) | Path (HPC module) |
 |-----------|-------------------|-------------------|
-| R Runtime | `/home/yu89975/micromamba/envs/exonBlock/` | `/hpc/apps/R/4.5.0/` |
-| R Headers | `.../lib/R/include` | `/hpc/apps/R/4.5.0/lib64/R/include` |
-| htslib | `.../include` | `/hpc/apps/htslib/1.22.1/include` |
+| R Runtime | `/home/yu-wang/micromamba/envs/exonBlock/` | `/usr/lib/R/` |
+| R Headers | `.../lib/R/include` | `/usr/lib/R/lib64/R/include` |
+| htslib | `.../include` | `/usr/local/include` |
 | R Library | `.../lib/R/library` | `~/R/x86_64-pc-linux-gnu-library/4.5.0/` |
 
 ## EXPORTED SYMBOLS
