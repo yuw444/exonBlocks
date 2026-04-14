@@ -1,83 +1,31 @@
-# exonBlocks
+# exonBlock
 
-Map cell barcode + UMI-level read blocks to overlapping exons. This repository provides utilities to extract read blocks from BAMs and assign each block (expanded from semicolon-delimited fields) to annotated exons.
+**Cell × Exon UMI Matrix Framework for scRNA-seq**
 
-## Requirements
+## Overview
 
-- R (>= 4.0)
-- R Packages: data.table, dplyr, tidyr, testthat
-- Access to an indexed BAM file
-- `htslib`
-  - Mac: `brew install htslib`
-  - Linux: check details how to compile from src at https://github.com/samtools/htslib
+exonBlock converts the standard cell × gene UMI matrix used in single-cell RNA-seq studies into a **cell × exon UMI matrix**, enhancing resolution to reveal exon-level regulation, alternative splicing, and cell subtype heterogeneity that is invisible to gene-level analysis.
 
-## Installation
+## Motivation
 
-Install required packages in R:
+Current scRNA-seq analyses rely on cell × gene UMI matrices that collapse mRNA transcript diversity and obscure exon- and isoform-level regulation. Preliminary data from iPSC knockout experiments demonstrate that gene-level expression can appear unchanged despite disruption of specific exons — highlighting a critical limitation of existing pipelines.
 
-```r
-if(!requireNamespace("data.table", quietly = TRUE)) install.packages("data.table")
-if(!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
-if(!requireNamespace("tidyr", quietly = TRUE)) install.packages("tidyr")
-devtools::install_github("https://github.com/yuw444/exonBlocks")
-```
+## Key Features
 
-## Common Error
+- Efficient pipeline to generate **cell × exon UMI matrices** from short-read sequencing
+- Modular, user-friendly software platform (analogous to Seurat for gene-level analysis)
+- Supports normalization, differential exon usage, and isoform inference
+- Designed for scalability to biobank-level datasets
 
-- Couldn't find the installed `htslib`
-  - `scan_core.c:3:10: fatal error: htslib/hts.h: No such file or directory
-       3 | #include <htslib/hts.h>`
-  - `Could not find htslib headers. Set HTSLIB_DIR or install via pkg-config/Homebrew/Conda`
+## Status
 
-- `Solution:` 
-  - Reinstall `htslib`, make sure the following command works in the terminal
-  `$ which htsfile`
+- [ ] Pipeline development (in progress)
+- [ ] Exon-level normalization methods
+- [ ] Differential exon usage framework
+- [ ] Isoform inference module
+- [ ] Software documentation
 
-## Example usage
+## Related Projects
 
-The following example is adapted for the manuscript analyzing Tnfrsf9 (CD137) exons in single-cell RNA-seq data. It:
-1. extracts read blocks overlapping a genomic interval into a TSV (`extract_exon_reads_hts`),
-2. expands semicolon-delimited block fields and maps blocks to exons (`cb_umi_exons`),
-3. summarizes exon assignments per (CB, UMI).
-
-```r
-library(exonBlocks)
-library(dplyr)
-
-chrom <- "4"
-exon_start <- 150920155
-exon_end <- 150946102
-bam <- "/scratch/g/chlin/Yu/CD137/data/AI/possorted_genome_bam.bam"
-block_tsv <- "AI.tsv"
-
-# extract read blocks overlapping the region -> writes AI.tsv
-temp <- extract_exon_reads_hts(
-  bam = bam,
-  chr = chrom,
-  start = exon_start,
-  end = exon_end,
-  out_bam = NULL,
-  tsv = block_tsv
-)
-
-# map expanded blocks to annotated exons
-df <- cb_umi_exons(
-  tsv = block_tsv,
-  meta_exons = "/scratch/g/chlin/Yu/exonBlocks/Tnfrsf9_exons_annotated.csv"
-)
-
-# summarize exon ids per (CB, UMI)
-df_sum <- df %>%
-  filter(!is.na(exon)) %>%
-  group_by(CB, UMI, .drop = TRUE) %>%
-  summarise(exon_ids = paste(sort(unique(exon)), collapse = ";"))
-
-table(df_sum$exon_ids)
-```
-
-## Notes
-
-- cb_umi_exons expects `block_start`, `block_end`, `block_seq` (semicolon-delimited allowed) and `CB`, `UMI` columns in the blocks TSV.
-- meta exons file must contain columns: `chr`, `start`, `end`, `exon`.
-- The implementation uses tidyr::separate_rows to expand semicolon lists and data.table::foverlaps to detect overlaps.
-- Installation has been tested on Macos/Linux successfully, any feedback on Windows installation would be appreciated
+- **K99/R00** — NIH grant proposal using exonBlock as the computational framework for Aim 2
+- **MoSAIC** — HMM-based mCA detection framework (provides mCA calls for integration in Aim 3)
