@@ -90,6 +90,7 @@ bam_to_cellranger <- function(
 #' @param path Output file path
 #' @param cell_metadata Optional data.frame with cell annotations (must have rowname = CB)
 #' @return Invisible NULL (writes to file)
+#' @importFrom utils write.csv
 #' @export
 #' @examples
 #' \dontrun{
@@ -134,9 +135,9 @@ export_cell_cluster_matrix <- function(
                if (ncol(mat) > 1000) {
                    warning("CSV export of large matrices may be slow")
                }
-               write.csv(as.matrix(mat), file = path)
-           })
-
+                write.csv(as.matrix(mat), file = path)
+            })
+    
     invisible(NULL)
 }
 

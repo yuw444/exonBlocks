@@ -44,3 +44,13 @@ meta/output/
 *.bai
 
 # Cleanup temp annotations
+
+# Pixi
+.pixi/
+
+# R profile (dev-only)
+.Rprofile
+.Rprofile.bak
+
+# Temp
+tmp/

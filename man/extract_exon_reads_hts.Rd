@@ -2,7 +2,7 @@
 % Please edit documentation in R/extract_exon_reads_hts.R
 \name{extract_exon_reads_hts}
 \alias{extract_exon_reads_hts}
-\title{htslib-core extractor (fast path)}
+\title{Extract Exon Reads from BAM using htslib}
 \usage{
 extract_exon_reads_hts(
   bam,
@@ -20,18 +20,23 @@ extract_exon_reads_hts(
 
 \item{chr}{Region chrom/contig (e.g., "chr1")}
 
-\item{start}{1-based inclusive}
+\item{start}{1-based inclusive start position}
 
-\item{end}{1-based inclusive}
+\item{end}{1-based inclusive end position}
 
 \item{out_bam}{Path for filtered BAM to write (or NULL to skip)}
 
-\item{tsv}{Path to TSV to write}
+\item{tsv}{Path to TSV output file}
 
-\item{xf_values}{integer vector; default c(25L,17L)}
+\item{xf_values}{Integer vector of allowed xf values (10X only). Default: c(25L, 17L)}
 
-\item{tech}{Character; sequencing technology, one of "10X(default)", "Smart-seq"}
+\item{tech}{Character; sequencing technology, one of "10X" (default) or "Smart-seq"}
+}
+\value{
+Character vector of TSV output path (invisibly)
 }
 \description{
-htslib-core extractor (fast path)
+Scans a BAM/CRAM file for a specified genomic region, extracts read blocks
+with CB/UB tags, and writes a TSV of block coordinates per (CB, UMI) pair.
+Optionally writes a filtered BAM containing only overlapping reads.
 }

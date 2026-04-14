@@ -37,10 +37,10 @@ cb_umi_exons <- function(
         header = TRUE
     ) %>%
         as.data.frame() %>%
-        tidyr::separate_rows(.data$block_start, .data$block_end, .data$block_seq, sep = ";") %>%
+        tidyr::separate_rows(all_of(c("block_start", "block_end", "block_seq")), sep = ";") %>%
         dplyr::mutate(
-            block_start = as.integer(.data$block_start),
-            block_end = as.integer(.data$block_end)
+            block_start = as.integer(block_start),
+            block_end = as.integer(block_end)
         ) %>%
         data.table::as.data.table()
 
@@ -49,7 +49,7 @@ cb_umi_exons <- function(
         header = TRUE
     ) %>%
         as.data.frame() %>%
-        dplyr::select(.data$chr, .data$start, .data$end, .data$exon) %>%
+        dplyr::select(all_of(c("chr", "start", "end", "exon"))) %>%
         data.table::as.data.table()
 
     data.table::setDT(df_blocks, key = c("block_start", "block_end"))

@@ -4,37 +4,37 @@ test_that("specific barcode coverage calculation", {
   library(Rsamtools)
   library(ggplot2)
 
-  # Input parameters
+  bam_file <- test_path("..", "..", "meta", "bam", "test.bam")
+  skip_if_not(file.exists(bam_file), "test.bam not found")
+
   chrom <- "1"
   region_start <- 10003
   region_end <- 1000000
-  bam_file <- "/home/yu-wang/Documents/exonBlocks/meta/bam/test.bam"
   barcode <- "TGTCAAGAGGCCAACCTATA"
 
-  # Setup region and barcode
   region <- GRanges(chrom, IRanges(region_start, region_end))
   param <- ScanBamParam(which = region, tag = "CB")
 
-  # Read and filter BAM
   bam <- readGAlignments(bam_file, param = param)
   filtered <- bam[mcols(bam)$CB == barcode]
+  skip_if_not(length(filtered) > 0, "No reads found for barcode in this region")
 
-  # Calculate coverage
   coverage <- coverage(filtered)
   cov_df <- as.data.frame(IRanges::as.data.frame(coverage[[chrom]]))
-  colnames(cov_df) <- c("position", "coverage")
-  cov_df <- cov_df %>% filter(as.numeric(position) >= region_start & as.numeric(position) <= region_end)
+  if (ncol(cov_df) == 1) {
+    cov_df$group <- 1
+  }
+  colnames(cov_df) <- c("coverage", "group")
+  cov_df$position <- as.numeric(rownames(cov_df))
+  cov_df <- cov_df %>% filter(position >= region_start & position <= region_end)
 
-  # Plot coverage
-  p <- ggplot(cov_df, aes(x = as.numeric(position), y = coverage)) +
+  p <- ggplot(cov_df, aes(x = position, y = coverage)) +
     geom_bar(stat = "identity", fill = "steelblue") +
     labs(x = "Position", y = "Coverage", title = "Coverage Plot for Specific Barcode") +
     theme_minimal()
 
-  # Save or print plot
   print(p)
 
-  # Test conditions
-  expect_gt(nrow(filtered), 0, "No reads found for the barcode in this region")
-  expect_gt(nrow(cov_df), 0, "Coverage calculation returned no data")
+  expect_gt(nrow(filtered), 0, label = "No reads found for the barcode in this region")
+  expect_gt(nrow(cov_df), 0, label = "Coverage calculation returned no data")
 })

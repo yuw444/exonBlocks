@@ -1,12 +1,18 @@
-test_that("multiplication works", {
+test_that("extract_exon_reads_hts and cb_umi_exons integration", {
+  skip_on_cran()
   library(dplyr)
   library(exonBlocks)
-  chrom = "4"
-  exon_start = 150920155
-  exon_end = 150946102
-  # bam_1 = "/scratch/g/chlin/Yu/CD137/data/AI/possorted_genome_bam.bam"
-  bam_1 = "/home/yu-wang/Documents/exonBlocks/meta/bam/test.bam"
-  block_tsv_1 = "/home/yu-wang/Documents/exonBlocks/meta/features/AI.tsv"
+
+  chrom <- "4"
+  exon_start <- 150920155
+  exon_end <- 150946102
+  bam_1 <- test_path("..", "..", "meta", "bam", "test.bam")
+  block_tsv_1 <- test_path("..", "..", "meta", "features", "AI.tsv")
+  exon_csv <- test_path("..", "..", "meta", "features", "Tnfrsf9_exons_annotated.csv")
+
+  skip_if_not(file.exists(bam_1), "test.bam not found")
+  skip_if_not(file.exists(block_tsv_1), "AI.tsv not found")
+  skip_if_not(file.exists(exon_csv), "Tnfrsf9_exons_annotated.csv not found")
 
   temp <- extract_exon_reads_hts(
     bam = bam_1,
@@ -15,12 +21,11 @@ test_that("multiplication works", {
     end = exon_end,
     out_bam = NULL,
     tsv = block_tsv_1,
-    # xf_values = c(25L, 17L)
     tech = "Smart-seq"
   )
-  
+
   df_exon <- read.table(
-    "/home/yu-wang/Documents/exonBlocks/meta/features/Tnfrsf9_exons_annotated.csv",
+    exon_csv,
     header = TRUE,
     sep = ",",
     stringsAsFactors = FALSE
@@ -31,10 +36,13 @@ test_that("multiplication works", {
 
   df <- cb_umi_exons(
     tsv = block_tsv_1,
-    meta_exons = "/home/yu-wang/Documents/exonBlocks/meta/features/Tnfrsf9_exons_annotated.csv"
+    meta_exons = exon_csv
   ) %>%
     mutate(length = end - start + 1) %>%
     filter(!is.na(exon))
+
+  expect_s3_class(df, "data.table")
+  expect_true("exon" %in% names(df))
 
   df %>%
     group_by(exon) %>%
@@ -50,7 +58,5 @@ test_that("multiplication works", {
       exon_ids = paste(sort(unique(exon)), collapse = ";")
     ) -> df_sum
 
-  table(df_sum$exon_ids)
-
-  
+  expect_true(nrow(df_sum) > 0)
 })

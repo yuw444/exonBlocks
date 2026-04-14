@@ -5,3 +5,17 @@
 ^R/AGENTS\.md$
 ^tests/AGENTS\.md$
 ^meta/bam/
+^pixi\.toml$
+^pixi\.lock$
+^\.pixi/
+^\.Rprofile$
+^\.Rprofile\.bak$
+^meta/output/
+^COMPILE_ENV\.md$
+^TODO$
+^\.vscode/
+^AGENTS\.md$
+^tests/AGENTS\.md$
+^R/AGENTS\.md$
+^src/AGENTS\.md$
+^src/\.gitignore$

@@ -87,3 +87,21 @@ gcc -fsyntax-only -c src/scan_core.c \
 - `src/bam2db_ds.c` is legacy — not registered in `init.c`, not exported. Contains SQLite-based pipeline
 - `bam2db_ds.c` uses `fprintf(stderr)` pattern — do NOT replicate in new code
 - See `COMPILE_ENV.md` for full HPC environment docs
+
+## Git Commit Policy (Standing Rule)
+
+No issue may be marked done without a corresponding git commit pushed to the `git-ai` remote. This is non-negotiable.
+
+### Per-repo git identity
+
+Before working in any repo, verify git config is set correctly:
+
+- exonBlock: `user.name "Senior Bioinformatics Engineer"`, `user.email "sre@omilab"`
+
+If misconfigured, fix it immediately before committing.
+
+### Commit discipline
+
+- Every completed task must result in at least one commit pushed to `git-ai`
+- Commit messages must be descriptive
+- Include `Co-Authored-By: Paperclip <noreply@paperclip.ing>` on every commit
