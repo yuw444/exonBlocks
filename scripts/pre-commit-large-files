@@ -1,0 +1,23 @@
+#!/bin/bash
+# Pre-commit hook: reject files larger than 50MB
+# Install: cp scripts/pre-commit-large-files .git/hooks/pre-commit
+set -e
+MAX_SIZE=$((50 * 1024 * 1024)) # 50MB in bytes
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$staged_files" ]; then
+  exit 0
+fi
+oversized=""
+for f in $staged_files; do
+  if [ -f "$f" ]; then
+    size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$MAX_SIZE" ]; then
+      oversized="$oversized\n  $f ($(( size / 1024 / 1024 ))MB)"
+    fi
+  fi
+done
+if [ -n "$oversized" ]; then
+  echo "ERROR: Files >50MB detected in staging area:$oversized"
+  echo "Remove them before committing."
+  exit 1
+fi

@@ -24,3 +24,15 @@ env/
 *.bedGraph
 *.wig
 *.sra
+
+# Large tabular files — find and review before committing:
+#   find . -type f \( -name '*.tsv' -o -name '*.csv' \) -size +10M
+# Do NOT blanket-exclude *.tsv/*.csv; small metadata files are tracked.
+# Files >10MB in these formats should be reviewed individually.
+# Files >50MB must NOT be committed (see pre-commit hook below).
+
+# Files >50MB — must never be committed.
+# Use this find command to locate oversized files:
+#   find . -type f -size +50M
+# A pre-commit hook is recommended. Install with:
+#   cp scripts/pre-commit-large-files .git/hooks/pre-commit
