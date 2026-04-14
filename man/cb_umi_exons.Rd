@@ -8,7 +8,7 @@ cb_umi_exons(tsv, meta_exons)
 }
 \arguments{
 \item{tsv}{Character. Path to the blocks TSV. Required columns: CB, UMI,
-block_start, block_end, block_seq (block_* may contain \";\"-separated lists).}
+block_start, block_end, block_seq (block_* may contain ";"-separated lists).}
 
 \item{meta_exons}{Character. Path to the exon metadata TSV. Required columns:
 chr, start, end, exon (or exon_id). start/end must be integer coordinates.}

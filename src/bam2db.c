@@ -2,6 +2,9 @@
 #include "mt19937ar.h"
 #include "utils.h"
 
+#include <R.h>
+#include <Rinternals.h>
+
 /* ── DNA encoding ────────────────────────────────────────────────────────── */
 
 uint8_t encode_base(char base)
@@ -81,7 +84,7 @@ static int exec_sql(sqlite3 *db, const char *sql)
     char *err = NULL;
     int rc = sqlite3_exec(db, sql, NULL, 0, &err);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", err);
+        REprintf("SQL error: %s\n", err);
         sqlite3_free(err);
     }
     return rc;
@@ -235,7 +238,7 @@ static int load_cells(sqlite3 *db, const char *barcodes_file,
 {
     gzFile fp = gzopen(barcodes_file, "r");
     if (!fp) {
-        fprintf(stderr, "ERROR: Cannot open barcode file %s\n", barcodes_file);
+        REprintf("ERROR: Cannot open barcode file %s\n", barcodes_file);
         return 1;
     }
 
@@ -257,7 +260,7 @@ static int load_cells(sqlite3 *db, const char *barcodes_file,
         n++;
     }
     gzclose(fp);
-    fprintf(stderr, "Total cell barcodes loaded: %zu\n", n);
+    REprintf("Total cell barcodes loaded: %zu\n", n);
 
     if (n == 0) { free(cells); return 1; }
 
@@ -346,7 +349,7 @@ static int load_regions(sqlite3 *db, const char *regions_file,
     exec_sql(db, "END TRANSACTION");
     sqlite3_finalize(stmt);
 
-    fprintf(stderr, "Regions loaded: %zu\n", reg->n);
+    REprintf("Regions loaded: %zu\n", reg->n);
     *out_reg = reg;
     return 0;
 }
@@ -372,13 +375,13 @@ static int process_bam(sqlite3 *db, const char *bam_file,
 {
     samFile *bam = sam_open(bam_file, "r");
     if (!bam) {
-        fprintf(stderr, "ERROR: Cannot open BAM file %s\n", bam_file);
+        REprintf("ERROR: Cannot open BAM file %s\n", bam_file);
         return 1;
     }
 
     bam_hdr_t *hdr = sam_hdr_read(bam);
     if (!hdr) {
-        fprintf(stderr, "ERROR: Cannot read BAM header from %s\n", bam_file);
+        REprintf("ERROR: Cannot read BAM header from %s\n", bam_file);
         hts_close(bam);
         return 1;
     }
@@ -411,7 +414,7 @@ static int process_bam(sqlite3 *db, const char *bam_file,
     if (roi && roi->enabled) {
         roi_tid = bam_name2id(hdr, roi->chr);
         if (roi_tid < 0) {
-            fprintf(stderr, "ERROR: Unknown contig '%s' in BAM %s\n", roi->chr, bam_file);
+            REprintf("ERROR: Unknown contig '%s' in BAM %s\n", roi->chr, bam_file);
             sqlite3_finalize(stmt);
             exec_sql(db, "END TRANSACTION");
             bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam);
@@ -425,7 +428,7 @@ static int process_bam(sqlite3 *db, const char *bam_file,
     if (use_iterator) {
         hts_idx_t *idx = sam_index_load(bam, bam_file);
         if (!idx) {
-            fprintf(stderr, "ERROR: No index found for %s (region query requires .bai)\n", bam_file);
+            REprintf("ERROR: No index found for %s (region query requires .bai)\n", bam_file);
             sqlite3_finalize(stmt);
             exec_sql(db, "END TRANSACTION");
             bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam);
@@ -434,14 +437,14 @@ static int process_bam(sqlite3 *db, const char *bam_file,
         itr = sam_itr_queryi(idx, roi_tid, roi->start, roi->end);
         hts_idx_destroy(idx);
         if (!itr) {
-            fprintf(stderr, "ERROR: Failed to create iterator for %s:%ld-%ld\n",
+            REprintf("ERROR: Failed to create iterator for %s:%ld-%ld\n",
                     roi->chr, (long)roi->start, (long)roi->end);
             sqlite3_finalize(stmt);
             exec_sql(db, "END TRANSACTION");
             bam_destroy1(rec); bam_hdr_destroy(hdr); hts_close(bam);
             return 1;
         }
-        fprintf(stderr, "Querying region %s:%ld-%ld\n", roi->chr,
+        REprintf("Querying region %s:%ld-%ld\n", roi->chr,
                 (long)roi->start, (long)roi->end);
     }
 
@@ -500,7 +503,7 @@ static int process_bam(sqlite3 *db, const char *bam_file,
 
     if (use_iterator && itr) hts_itr_destroy(itr);
 
-    fprintf(stderr, "BAM %s: total=%zu, sampled=%zu, valid=%zu\n",
+    REprintf("BAM %s: total=%zu, sampled=%zu, valid=%zu\n",
             bam_file, total, sampled, valid);
 
     *out_total = total;
@@ -525,15 +528,15 @@ static int generate_10x(sqlite3 *db, const char *path_out,
 
     snprintf(path, sizeof(path), "%s/barcodes.tsv.gz", path_out);
     gzFile f_bc = gzopen(path, "wb");
-    if (!f_bc) { fprintf(stderr, "ERROR: cannot open %s\n", path); return 1; }
+    if (!f_bc) { REprintf("ERROR: cannot open %s\n", path); return 1; }
 
     snprintf(path, sizeof(path), "%s/features.tsv.gz", path_out);
     gzFile f_ft = gzopen(path, "wb");
-    if (!f_ft) { gzclose(f_bc); fprintf(stderr, "ERROR: cannot open %s\n", path); return 1; }
+    if (!f_ft) { gzclose(f_bc); REprintf("ERROR: cannot open %s\n", path); return 1; }
 
     snprintf(path, sizeof(path), "%s/matrix.mtx.gz", path_out);
     gzFile f_mx = gzopen(path, "wb");
-    if (!f_mx) { gzclose(f_bc); gzclose(f_ft); fprintf(stderr, "ERROR: cannot open %s\n", path); return 1; }
+    if (!f_mx) { gzclose(f_bc); gzclose(f_ft); REprintf("ERROR: cannot open %s\n", path); return 1; }
 
     if (exec_sql(db,
         "CREATE TABLE mtx AS "
@@ -601,11 +604,11 @@ int bam2db(
     hts_pos_t region_end)
 {
     if (rate_cell <= 0.0f || rate_cell > 1.0f) {
-        fprintf(stderr, "ERROR: rate_cell must be in (0, 1], got %f\n", rate_cell);
+        REprintf("ERROR: rate_cell must be in (0, 1], got %f\n", rate_cell);
         return 1;
     }
     if (rate_depth <= 0.0f || rate_depth > 1.0f) {
-        fprintf(stderr, "ERROR: rate_depth must be in (0, 1], got %f\n", rate_depth);
+        REprintf("ERROR: rate_depth must be in (0, 1], got %f\n", rate_depth);
         return 1;
     }
 
@@ -621,7 +624,7 @@ int bam2db(
     roi.end = region_end;
 
     if (sqlite3_open(db_file, &db) != SQLITE_OK) {
-        fprintf(stderr, "ERROR: Cannot open/create database: %s\n", sqlite3_errmsg(db));
+        REprintf("ERROR: Cannot open/create database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return 1;
     }
@@ -661,7 +664,7 @@ int table2gz(sqlite3 *db_handle, const char *table_name,
 
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db_handle, sql, -1, &stmt, NULL) != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db_handle));
+        REprintf("SQL error: %s\n", sqlite3_errmsg(db_handle));
         return 1;
     }
 
@@ -727,7 +730,7 @@ size_t nrow_sql_table(sqlite3 *db_handle, const char *table_name)
 
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db_handle, sql, -1, &stmt, NULL) != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db_handle));
+        REprintf("SQL error: %s\n", sqlite3_errmsg(db_handle));
         return 0;
     }
 

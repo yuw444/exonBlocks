@@ -20,5 +20,6 @@ Imports: data.table (>= 1.17.0), dplyr (>= 1.1.4), tidyr (>= 1.3.1), magrittr (>
           GenomicRanges (>= 1.55.0), IRanges (>= 2.40.0),
           GenomicFeatures (>= 1.55.0)
 Suggests: testthat (>= 3.0.0), Matrix (>= 1.6.0), zellkonverter, loomR, arrow, withr,
-           TxDb.Hsapiens.UCSC.hg38.knownGene, TxDb.Mmusculus.UCSC.mm10.knownGene
+            TxDb.Hsapiens.UCSC.hg38.knownGene, TxDb.Mmusculus.UCSC.mm10.knownGene,
+            GenomicAlignments, Rsamtools, ggplot2
 Config/testthat/edition: 3

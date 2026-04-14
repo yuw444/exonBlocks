@@ -1,5 +1,9 @@
 #include "hashtable.h"
 
+#ifdef EXONBLOCKS_DEBUG
+#include <stdio.h>
+#endif
+
 static size_t hash_table_index(hash_table *ht, const char *key)
 {
     size_t result = ht->hash(key, strlen(key)) % ht->size;
@@ -48,6 +52,7 @@ void hash_table_destroy(hash_table *ht)
 
 void hash_table_print(hash_table *ht)
 {
+#ifdef EXONBLOCKS_DEBUG
     printf("Start printing hash table:\n");
     for (int i = 0; i < ht->size; i++) {
         entry *e = ht->elements[i];
@@ -63,6 +68,9 @@ void hash_table_print(hash_table *ht)
         }
     }
     printf("End table\n");
+#else
+    (void)ht;
+#endif
 }
 
 // if the key already exists, return false and free the key and obj is user's responsibility

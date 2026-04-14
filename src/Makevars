@@ -95,13 +95,14 @@ ifeq ($(strip $(PKG_LIBS)),)
   $(error Could not find htslib library. Set HTSLIB_DIR or install via pkg-config/Homebrew/Conda.)
 endif
 
-## ---- SQLite3 (required by bam2db_ds.c) ---------------------------------------
+## ---- SQLite3 (required by bam2db.c / bam2db_wrapper.c) -----------------------
 PKG_LIBS += -lsqlite3
 
-## Optional: tighten compilation (works fine with Clang and GCC)
-CFLAGS   += -Wall -O2 -fopenmp
-CXXFLAGS += -Wall -O2 -fopenmp
-LDFLAGS  += -fopenmp
+## ---- OpenMP support ----------------------------------------------------------
+## Use R-provided OpenMP flags (SHLIB_OPENMP_CFLAGS) which are platform-aware
+## and CRAN-acceptable.  On macOS (no OpenMP), these expand to empty.
+PKG_CFLAGS += $(SHLIB_OPENMP_CFLAGS)
+PKG_LIBS   += $(SHLIB_OPENMP_CFLAGS)
 
 ## Helper to print resolved flags (safe; won’t hijack builds)
 ifeq ($(MAKECMDGOALS),show-flags)
@@ -109,6 +110,4 @@ ifeq ($(MAKECMDGOALS),show-flags)
 show-flags:
 	@echo "PKG_CFLAGS=$(PKG_CFLAGS)"
 	@echo "PKG_LIBS=$(PKG_LIBS)"
-	@echo "CFLAGS=$(CFLAGS)"
-	@echo "CXXFLAGS=$(CXXFLAGS)"
 endif

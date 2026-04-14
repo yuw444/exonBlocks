@@ -1,3 +1,5 @@
+utils::globalVariables(c("all_of", "block_start", "block_end", "block_seq", "chr", "exon"))
+
 #' @title Map Cell Barcode + UMI to Overlapping Exons
 #' @description Expand semicolon-delimited block fields and identify exons that overlap
 #'   each block for every (CB, UMI) pair. The function reads a blocks TSV (produced by
@@ -10,7 +12,7 @@
 #'   3. reads the exon metadata and selects the required columns;
 #'   4. uses data.table::foverlaps() to find any overlap between blocks and exons.
 #' @param tsv Character. Path to the blocks TSV. Required columns: CB, UMI,
-#'   block_start, block_end, block_seq (block_* may contain \";\"-separated lists).
+#'   block_start, block_end, block_seq (block_* may contain ";"-separated lists).
 #' @param meta_exons Character. Path to the exon metadata TSV. Required columns:
 #'   chr, start, end, exon (or exon_id). start/end must be integer coordinates.
 #' @return A data.table of overlapping records. Columns include at minimum:

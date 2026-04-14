@@ -14,6 +14,7 @@
 ^COMPILE_ENV\.md$
 ^TODO$
 ^\.vscode/
+^\.gitignore$
 ^AGENTS\.md$
 ^tests/AGENTS\.md$
 ^R/AGENTS\.md$

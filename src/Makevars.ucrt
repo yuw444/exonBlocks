@@ -1,0 +1,33 @@
+# Makevars.ucrt for Windows UCRT (required by CRAN policy for GNU Make extensions)
+# This is a minimal fallback: htslib must be available via pkg-config or HTSLIB_DIR
+
+PKG_CPPFLAGS ?=
+PKG_CFLAGS   ?=
+PKG_LIBS     ?=
+
+# Prefer explicit HTSLIB_DIR
+ifneq ($(strip $(HTSLIB_DIR)),)
+  PKG_CFLAGS += -I$(HTSLIB_DIR)/include
+  PKG_LIBS   += -L$(HTSLIB_DIR)/lib -lhts
+endif
+
+# Try pkg-config if available
+ifeq ($(strip $(PKG_CFLAGS)),)
+  PKG_CFLAGS += $(shell pkg-config --cflags htslib 2>/dev/null)
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  PKG_LIBS   += $(shell pkg-config --libs   htslib 2>/dev/null)
+endif
+
+# Fail clearly
+ifeq ($(strip $(PKG_CFLAGS)),)
+  $(error Windows UCRT: Set HTSLIB_DIR or install htslib via pkg-config.)
+endif
+ifeq ($(strip $(PKG_LIBS)),)
+  $(error Windows UCRT: Could not find htslib library.)
+endif
+
+PKG_LIBS += -lsqlite3
+
+CFLAGS   += -O2 -Wall
+CXXFLAGS += -O2 -Wall

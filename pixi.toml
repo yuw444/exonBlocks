@@ -39,4 +39,4 @@ platforms = ["linux-64"]
 install = "R -e 'devtools::install()'"
 test = "R -e 'devtools::test()'"
 doc = "R -e 'devtools::document()'"
-check = "R -e 'devtools::check()'"
+check = "TMPDIR=/home/yu-wang/tmp _R_CHECK_FORCE_SUGGESTS_=false R -e 'devtools::check(args = \"--no-manual\")'"

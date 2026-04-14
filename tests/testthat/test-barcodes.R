@@ -1,4 +1,7 @@
 test_that("specific barcode coverage calculation", {
+  skip_on_cran()
+  skip_if_not_installed("GenomicAlignments")
+  skip_if_not_installed("Rsamtools")
   library(dplyr)
   library(GenomicAlignments)
   library(Rsamtools)

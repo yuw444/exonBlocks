@@ -4,6 +4,9 @@
 #include "bam2db.h"
 #include <string.h>
 
+#include <R.h>
+#include <Rinternals.h>
+
 size_t *GetSeqInt(size_t start, size_t end, size_t step)
 {
     if (step == 0) {
@@ -113,7 +116,7 @@ region_registry *region_registry_build(const char *file)
 {
     FILE *fp = fopen(file, "r");
     if (!fp) {
-        fprintf(stderr, "ERROR: Cannot open regions file %s\n", file);
+        REprintf("ERROR: Cannot open regions file %s\n", file);
         return NULL;
     }
 
