@@ -36,3 +36,11 @@ env/
 #   find . -type f -size +50M
 # A pre-commit hook is recommended. Install with:
 #   cp scripts/pre-commit-large-files .git/hooks/pre-commit
+
+# Large BAM files in meta/
+meta/bam/
+meta/output/
+*.bam
+*.bai
+
+# Cleanup temp annotations

@@ -8,7 +8,7 @@ test_that("specific barcode coverage calculation", {
   chrom <- "1"
   region_start <- 10003
   region_end <- 1000000
-  bam_file <- "/scratch/g/chlin/Yu/CD137/data/AI/possorted_genome_bam.bam"
+  bam_file <- "/home/yu-wang/Documents/exonBlocks/meta/bam/test.bam"
   barcode <- "TGTCAAGAGGCCAACCTATA"
 
   # Setup region and barcode

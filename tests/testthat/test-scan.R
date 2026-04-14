@@ -5,8 +5,8 @@ test_that("multiplication works", {
   exon_start = 150920155
   exon_end = 150946102
   # bam_1 = "/scratch/g/chlin/Yu/CD137/data/AI/possorted_genome_bam.bam"
-  bam_1 = "/scratch/g/chlin/Yu/exonBlocks/sub/sh/aligned_Aligned.sortedByCoord.out.bam"
-  block_tsv_1 = "/scratch/g/chlin/Yu/exonBlocks/meta/AI.tsv"
+  bam_1 = "/home/yu-wang/Documents/exonBlocks/meta/bam/test.bam"
+  block_tsv_1 = "/home/yu-wang/Documents/exonBlocks/meta/features/AI.tsv"
 
   temp <- extract_exon_reads_hts(
     bam = bam_1,
@@ -20,7 +20,7 @@ test_that("multiplication works", {
   )
   
   df_exon <- read.table(
-    "/scratch/g/chlin/Yu/exonBlocks/meta/Tnfrsf9_exons_annotated.csv",
+    "/home/yu-wang/Documents/exonBlocks/meta/features/Tnfrsf9_exons_annotated.csv",
     header = TRUE,
     sep = ",",
     stringsAsFactors = FALSE
@@ -31,7 +31,7 @@ test_that("multiplication works", {
 
   df <- cb_umi_exons(
     tsv = block_tsv_1,
-    meta_exons = "/scratch/g/chlin/Yu/exonBlocks/meta/Tnfrsf9_exons_annotated.csv"
+    meta_exons = "/home/yu-wang/Documents/exonBlocks/meta/features/Tnfrsf9_exons_annotated.csv"
   ) %>%
     mutate(length = end - start + 1) %>%
     filter(!is.na(exon))
