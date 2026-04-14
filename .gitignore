@@ -11,3 +11,16 @@
 meta
 sub/
 env/
+
+# Raw/large genomic data files
+*.bam
+*.bai
+*.cram
+*.crai
+*.vcf
+*.fastq
+*.fq
+*.bigWig
+*.bedGraph
+*.wig
+*.sra
