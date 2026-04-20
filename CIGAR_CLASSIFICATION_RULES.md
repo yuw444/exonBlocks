@@ -136,6 +136,67 @@ Read
             spliced = 1 if has_N, else 0
 ```
 
+## Relationship to Existing Tools
+
+### zUMIs (annotation-only, no CIGAR)
+
+zUMIs uses two-pass featureCounts (exon SAF → intron SAF) to classify reads. It does **not** parse CIGAR. Categories:
+
+| zUMIs Category | Rule |
+|---|---|
+| **Unused-BC** | Barcode not in kept cell whitelist |
+| **Unmapped** | STAR could not map the read |
+| **Ambiguity** | ES or IS = `Unassigned_Ambiguity` |
+| **Intergenic** | ES=NoFeatures AND IS=NoFeatures |
+| **Intron** | ES=NoFeatures AND IS=Assigned |
+| **Exon** | ES=Assigned (regardless of GI) |
+
+Key design choices:
+- **Exon overrides intron**: If a read has both GE and GI, it is classified as **Exon**, not "both"
+- Intron SAF constructed from gene-internal gaps (GTF exon gaps filtered to be within gene boundaries, width 10–100kb)
+- Two-pass: first assign exons, then feed unassigned reads to introns
+- Uses `largestOverlap=TRUE` and `allowMultiOverlap` for tie-breaking
+- Offers intron probability score (truncated Poisson) to validate intronic signal above intergenic background
+
+### Velocyto (CIGAR-based, annotation-assisted)
+
+Velocyto uses **CIGAR N-operations** (splice junctions) plus GTF annotation overlap:
+
+| Velocyto Category | Rule |
+|---|---|
+| **Spliced** | CIGAR contains N, or exon-overlapping with no intron overlap |
+| **Unspliced** | Single block overlapping intron only |
+| **Ambiguous** | Overlaps both exon and intron of same gene (boundary read) |
+
+This is closest to our CIGAR-based approach. The key difference: velocyto uses `pysam` to parse CIGAR directly, while we use `write_blocks_one()` in `scan_core.c`.
+
+### Cell Ranger / STARsolo
+
+Cell Ranger and STARsolo use STAR's splice junction database (SJ.out.tab) plus GTF annotation. Classification is similar to zUMIs but integrated into the mapper. `--include-introns` mode adds intronic counting.
+
+### Comparison Table
+
+| Tool | Method | Spliced detection | Intron detection | Multi-exon reads |
+|------|--------|-------------------|-----------------|------------------|
+| **zUMIs** | featureCounts annotation | Annotation overlap | Annotation overlap (intron SAF) | Single assignment per read |
+| **Velocyto** | CIGAR + GTF | CIGAR N-operator | GTF intron overlap | Per-exon from CIGAR blocks |
+| **STARsolo** | STAR SJ + GTF | Splice junction database | GTF intron regions | Integrated in mapper |
+| **alevin-fry** | Pseudoalignment | Extended reference index | Pre-mRNA transcripts in index | Spliced vs unspliced isoforms |
+| **exonBlocks (ours)** | CIGAR + foverlaps | CIGAR N-operator | GTF exon gaps (intron SAF) | Per-block foverlaps assignment |
+
+### Why our CIGAR-based approach is better for exon-level analysis
+
+1. **Per-block exon assignment**: A spliced read spanning 3 exons produces 3 independent (CB, UMI, exon) rows. zUMIs assigns the whole read to one gene.
+2. **No two-pass required**: Single CIGAR parse + single foverlaps. zUMIs requires two featureCounts passes.
+3. **Junction precision**: CIGAR N-operations directly identify splice junctions. Annotation-only methods (zUMIs) cannot distinguish a junction read from a read that happens to overlap both exon and intron.
+4. **Exon cluster resolution**: Our `make_exon_clusters()` merges overlapping exons, preventing double-counting from reads hitting multiple exons of the same gene.
+
+### Where zUMIs annotation approach is still useful
+
+- **ES/IS/GE/GI tags** provide a quality filter: reads with ES=Ambiguity should be flagged
+- **Intron probability score** validates that intronic signal is genuine, not noise
+- **Two-pass featureCounts** is a good cross-check against CIGAR-based classification for Smart-seq data where featureCounts tags are available
+
 ## Implementation Notes
 
 - `spliced` column: `1` if CIGAR contains N, `0` otherwise
