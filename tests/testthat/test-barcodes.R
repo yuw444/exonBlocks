@@ -11,15 +11,16 @@ test_that("specific barcode coverage calculation", {
   skip_if_not(file.exists(bam_file), "test.bam not found")
 
   chrom <- "1"
-  region_start <- 10003
-  region_end <- 1000000
-  barcode <- "TGTCAAGAGGCCAACCTATA"
+  region_start <- 3600000
+  region_end <- 3750000
+  barcode <- "GCGCAGTGTGATGTCT-1"
 
   region <- GRanges(chrom, IRanges(region_start, region_end))
   param <- ScanBamParam(which = region, tag = "CB")
 
   bam <- readGAlignments(bam_file, param = param)
-  filtered <- bam[mcols(bam)$CB == barcode]
+  cb_vals <- mcols(bam)$CB
+  filtered <- bam[!is.na(cb_vals) & cb_vals == barcode]
   skip_if_not(length(filtered) > 0, "No reads found for barcode in this region")
 
   coverage <- coverage(filtered)
@@ -38,6 +39,6 @@ test_that("specific barcode coverage calculation", {
 
   print(p)
 
-  expect_gt(nrow(filtered), 0, label = "No reads found for the barcode in this region")
+  expect_gt(length(filtered), 0, label = "No reads found for the barcode in this region")
   expect_gt(nrow(cov_df), 0, label = "Coverage calculation returned no data")
 })

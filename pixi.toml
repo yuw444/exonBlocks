@@ -34,6 +34,8 @@ platforms = ["linux-64"]
 "r-monocle3" = "*"
 "radian" = "*"
 "r-withr" = "*"
+samtools = ">=1.23.1,<2"
+bcftools = ">=1.23.1,<2"
 
 [tasks]
 install = "R -e 'devtools::install()'"

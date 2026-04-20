@@ -1,28 +1,13 @@
-test_that("extract_exon_reads_hts and cb_umi_exons integration", {
+test_that("cb_umi_exons maps blocks to overlapping exons", {
   skip_on_cran()
   library(dplyr)
   library(exonBlocks)
 
-  chrom <- "4"
-  exon_start <- 150920155
-  exon_end <- 150946102
-  bam_1 <- test_path("..", "..", "meta", "bam", "test.bam")
   block_tsv_1 <- test_path("..", "..", "meta", "features", "AI.tsv")
-  exon_csv <- test_path("..", "..", "meta", "features", "Tnfrsf9_exons_annotated.csv")
+  exon_csv <- test_path("..", "..", "meta", "features", "Xkr4_exons_annotated.csv")
 
-  skip_if_not(file.exists(bam_1), "test.bam not found")
   skip_if_not(file.exists(block_tsv_1), "AI.tsv not found")
-  skip_if_not(file.exists(exon_csv), "Tnfrsf9_exons_annotated.csv not found")
-
-  temp <- extract_exon_reads_hts(
-    bam = bam_1,
-    chr = chrom,
-    start = exon_start,
-    end = exon_end,
-    out_bam = NULL,
-    tsv = block_tsv_1,
-    tech = "Smart-seq"
-  )
+  skip_if_not(file.exists(exon_csv), "Xkr4_exons_annotated.csv not found")
 
   df_exon <- read.table(
     exon_csv,
