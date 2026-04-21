@@ -55,3 +55,10 @@ meta/output/
 # Temp
 tmp/
 exonBlocks.Rcheck/
+
+# Build/test artifacts
+*.html
+*.pdf
+tests/testthat/Rplots.pdf
+src/*.o
+src/*.so
