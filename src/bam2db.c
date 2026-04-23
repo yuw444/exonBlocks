@@ -125,7 +125,7 @@ static read_identity extract_identity(const bam1_t *rec, protocol_t proto)
     }
     case PROTO_ZUMIS: {
         uint8_t *bx = bam_aux_get(rec, "BX");
-        uint8_t *ub = bam_aux_get(rec, "UB");
+        uint8_t *ub = bam_aux_get(rec, "UX");
         if (bx && ub) {
             id.cb = bam_aux2Z(bx);
             id.umi = bam_aux2Z(ub);

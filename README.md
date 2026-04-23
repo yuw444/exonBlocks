@@ -53,3 +53,53 @@ meta/
 ## Test Paths
 
 All test scripts have been updated to use local paths under `meta/` instead of the old HPC paths (`/scratch/g/chlin/Yu/exonBlocks/`). Tests use `skip_if_not(file.exists(...))` to gracefully handle missing data files.
+
+
+typedef struct {
+    size_t n;
+    int32_t *start;
+    int32_t *end;
+    int32_t *gene_id;
+    int32_t *exon_cluster_id;
+} ExonClusterIndex;
+typedef struct {
+    size_t n;
+    int32_t *start;
+    int32_t *end;
+    int32_t *gene_id;
+} GeneIndex;
+typedef struct {
+    size_t n_contigs;
+    ExonClusterIndex *exon_index;
+    GeneIndex *gene_index;
+} GenomeAnnotation; 
+
+| overlap exon cluster | within gene | interpretation |
+| ------------ | ------------ | -------------- |
+| yes          | yes          | exonic         |
+| no           | yes          | unspliced      |
+| yes          | no           | impossible     |
+| no           | no           | intergenic     | 
+
+
+same time, let's update all the notes about classify rule of our package using bit field follow
+
+NSEIG 
+
+N: has N in CIGAR
+S: all gene-mapped blocks belong to same gene
+E: at least one exon block present
+I: at least one intron block present
+G: at least one intergenic block present
+
+H: has N in CIGAR
+U: uniqueness of read blocks mapped gene
+G: all blocks within gene region
+E: all blocks within exon cluster
+
+1111 ->  SPLICED
+1011 -> CHIMERIC
+_110 -> UNSPLICED
+Other -> UNASSIGNED
+
+

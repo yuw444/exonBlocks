@@ -62,9 +62,10 @@ make_exon_clusters <- function(
     # -------------------------------------------------------------------------
     if (verbose) message("Loading TxDb for ", species, "...")
 
-    suppressPackageStartupMessages({
-        txdb <- get(txdb_pkg)
-    })
+    if (!requireNamespace(txdb_pkg, quietly = TRUE)) {
+        stop("Package ", txdb_pkg, " not installed. Install with: BiocManager::install('", txdb_pkg, "')")
+    }
+    txdb <- get(txdb_pkg, envir = loadNamespace(txdb_pkg))
 
     # -------------------------------------------------------------------------
     # Extract exons

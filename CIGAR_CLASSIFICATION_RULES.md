@@ -67,6 +67,7 @@ overlap = foverlaps(block, exons)
 | Block overlaps exon of gene A and intron of gene B | **AMBIGUOUS_CONFLICT** | Overlapping/antisense gene loci |
 | Block overlaps no annotation | **UNASSIGNED** | Intergenic / UTR / unannotated |
 
+
 ### Rule 3: Multi-block spliced reads — per-block exon assignment
 
 For reads with `has_N == true` and `num_blocks ≥ 2`, each block is independently overlapped against exons:

@@ -7,6 +7,7 @@
 prepare_classification_annotation(
   species = "hg38",
   min_gap_width = 10,
+  chromosomes = NULL,
   verbose = TRUE
 )
 }
@@ -15,14 +16,17 @@ prepare_classification_annotation(
 
 \item{min_gap_width}{Integer. Exons within this distance are merged into same cluster. Default: 10.}
 
+\item{chromosomes}{Character vector. Restrict to these chromosomes (e.g. "chr19"). NULL = all.}
+
 \item{verbose}{Logical. Print progress. Default: TRUE.}
 }
 \value{
-A list with components: exons (GRanges with gene_id), introns (GRanges with gene_id),
-exon_clusters (GRanges from \code{make_exon_clusters}).
+A list with components: exons (data.frame), introns (data.frame),
+exon_clusters (GRanges), gene_ids, gene_to_idx.
 }
 \description{
 Extracts exon and intron coordinates with gene IDs from a TxDb package
-and prepares exon clusters. Introns are computed as the gaps within
-each gene's exon span (union strategy).
+and prepares exon clusters. Uses \code{GenomicFeatures::exons(columns="gene_id")}
+for direct exon-to-gene mapping and \code{GenomicFeatures::intronsBy(by="gene")}
+for intron coordinates — no per-gene loops.
 }

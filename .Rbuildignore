@@ -20,3 +20,4 @@
 ^R/AGENTS\.md$
 ^src/AGENTS\.md$
 ^src/\.gitignore$
+^src/DATA_STRUCTURES\.md$
