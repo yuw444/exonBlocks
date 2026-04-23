@@ -16,6 +16,7 @@ R/
 |------|------|-------|
 | Add new C binding | `extract_exon_reads_hts.R` | Pattern: `.Call()` wrapper with input validation |
 | Exon overlap logic | `cb_umi_exons.R` | `tidyr::separate_rows` + `data.table::foverlaps` |
+| Classification wrapper | `classify_reads.R` | `classify_reads` calls C with HUGE bit field logic |
 | CellRanger matrix | `build_matrix.R` | `bam_to_cellranger` calls C per chromosome |
 | Matrix export formats | `build_matrix.R` | 10x (H5AD), loom, arrow, CSV |
 | Tag extraction wrapper | `build_matrix.R` | `extract_unique_tags` — OpenMP C function |

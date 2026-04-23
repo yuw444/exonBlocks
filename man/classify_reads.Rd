@@ -4,10 +4,17 @@
 \alias{classify_reads}
 \title{Classify Reads and Build Per-Category Cell x Exon Matrices}
 \usage{
-classify_reads(bam, annotation, out_dir, xf_values = c(25L, 17L), tech = "10X")
+classify_reads(
+  bam,
+  annotation,
+  out_dir,
+  xf_values = c(25L, 17L),
+  tech = "10X",
+  gene_span_pad = 0L
+)
 }
 \arguments{
-\item{bam}{Character. Path to input BAM/CRAM with CB/UB tags.}
+\item{bam}{Character. Path to input BAM/CRAM.}
 
 \item{annotation}{List from \code{prepare_classification_annotation}.}
 
@@ -15,13 +22,17 @@ classify_reads(bam, annotation, out_dir, xf_values = c(25L, 17L), tech = "10X")
 
 \item{xf_values}{Integer vector of allowed xf values (10X only). Default: c(25L, 17L).}
 
-\item{tech}{Character. "10X" or "Smart-seq". Default: "10X".}
+\item{tech}{Character. "10X", "Smart-seq3Xpress", or "Smart-seq". Default: "10X".}
+
+\item{gene_span_pad}{Integer. Padding (bp) added to read span when checking gene overlap. Default: 0L.}
 }
 \value{
-Named list with classification counts and output directory.
+Named list with classification counts, HUGE flag totals, and output directory.
 }
 \description{
-Classifies aligned reads into spliced, unspliced, ambiguous, and unassigned
-categories based on CIGAR and annotation overlap. Outputs CellRanger-style
-sparse matrices for each non-unassigned category.
+Classifies aligned reads into spliced, unspliced, chimeric, and
+unassigned categories based on the HUGE bit field scheme:
+H: has N in CIGAR; U: unique gene assignment; G: all blocks in gene; E: all blocks exonic.
+1111 -> SPLICED, 1011 -> CHIMERIC, _110 -> UNSPLICED, other -> UNASSIGNED.
+Outputs CellRanger-style sparse matrices for each non-unassigned category.
 }
